@@ -18,7 +18,7 @@
 - XClip (read [Clipboard persistence](https://wiki.ubuntu.com/ClipboardPersistence) )
   + `apt install xclip` for Ubuntu/Debian
   + `pacman -S xclip` for Arch Linux
-- PyQT5
+- PyQt5
   + `apt install python3-pyqt5` for Ubuntu
   + `pacman -S python-pyqt5` for Arch Linux
 
@@ -84,7 +84,7 @@ Now I can call Chizuhoru with PrintScreen hotkey.
 
 ## Compiling
 
-Compiling python scripts saves some time at its first launch. You can do that by making:  
+Compiling python script saves some time at its first launch. You can do that by making:  
   ```shell
   python3 -m py_compile main.py overlay.py processing.py  
   ```  
@@ -105,5 +105,6 @@ I don't know, except for Arch Xfce/Openbox and Linux Mint Xfce. Neither I don't 
 
 **Q**: Why Python?  
 **A**: uhhhhhhhhhhh...  
+
 
 Icon is not mine, so all rights to this art belong to the [owner](http://theawkwardyeti.com/about/).

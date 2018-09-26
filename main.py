@@ -378,6 +378,8 @@ class SaveDialog(QtWidgets.QWidget):
             else:
                 processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             result = processing.custom_upload(SHOTPATH[0], SHOTNAME, customArgs)
+            self.tab1.setDisabled(True)
+            self.push_image.setDisabled(True)
             self.push_link.setDisabled(False)
             self.push_link.setText(result)
             self.push_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
@@ -401,6 +403,8 @@ class SaveDialog(QtWidgets.QWidget):
             else:
                 processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             result = processing.imgur_upload(SHOTPATH[0], customArgs)
+            self.tab1.setDisabled(True)
+            self.push_imgur_image.setDisabled(True)
             self.push_imgur_link.setDisabled(False)
             self.push_imgur_link.setText(result)
             self.push_imgur_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")

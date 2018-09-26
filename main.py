@@ -1,0 +1,628 @@
+#!/usr/bin/python3
+import sys
+from time import sleep
+from argparse import ArgumentParser
+from os import remove, path, getpid, environ, unlink, kill
+from PyQt5.QtGui import QPainter, QImage, QPalette, QBrush
+from PyQt5 import QtCore, QtGui, QtWidgets
+from processing import SHOTNAME, SHOTPATH
+from PyQt5.QtCore import QSize, Qt
+import json
+import overlay
+import processing
+import subprocess
+
+class ScreenWindow(overlay.BaseLayer):
+    def __init__(self):
+        super().__init__()
+        global SHOTNAME, SHOTPATH
+        #update screenshot name and path
+        SHOTNAME = "{}.png".format(processing.datetime.now().strftime("%d_%b_%Y_%H:%M:%S"))
+        SHOTPATH[0] = "/tmp/{}".format(SHOTNAME)
+        if args["directory"] != None:
+            SHOTPATH[1] = "{}/{}".format(args["directory"], SHOTNAME)
+        else:
+            SHOTPATH[1] = None
+        processing.scrot(SHOTPATH[0])
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
+
+        self.table_widget = SaveDialog()
+        self.showFullScreen()
+        self.zoom = overlay.LoopZoop()
+        self.crosshair = overlay.Crosshair()
+        self.toolkit = overlay.Toolkit()
+        self.colorsDialog = overlay.LePalette()
+        self.background()
+        self.actions = processing.Stack()
+
+    def background(self):
+        oImage = QImage(SHOTPATH[0])
+        sImage = oImage.scaled(QSize(self.width,self.height))
+        palette = QPalette()
+        palette.setBrush(10, QBrush(sImage))
+        self.setPalette(palette)
+
+    def paintEvent(self, event):
+        qp = QtGui.QPainter(self)
+        br = QtGui.QBrush(QtGui.QColor(103, 150, 188, 60))
+        qp.setBrush(br)
+        rect = QtCore.QRect(self.begin, self.end)
+        self.rectx, self.recty, self.rectw, self.recth = list(rect.getRect())
+        self.detailedcoord = list(rect.getCoords())
+        if self.toolkit.switch == 2:
+            qp.drawEllipse(rect)
+        elif self.toolkit.switch == 4:
+            qp.drawLine(self.begin.x(), self.begin.y(), self.end.x(), self.end.y())
+        elif self.toolkit.switch == 5:
+            br = QtGui.QPen(QtGui.QColor(103, 150, 188, 60), 4)
+            qp.setPen(br)
+            qp.drawPoint(self.end.x(), self.end.y())
+        else:
+            qp.drawRect(rect)
+    
+    def redrawImage(self):
+        self.background()
+        self.update()
+
+    def closeScreen(self):
+        if path.isfile(SHOTPATH[0]):
+            remove(SHOTPATH[0])
+        self.close()
+        self.toolkit.close()
+        self.colorsDialog.close()
+  
+    def hideScreen(self):
+        self.hide()
+        self.toolkit.hide()
+        self.colorsDialog.hide()
+
+    def mousePressEvent(self, event):
+        self.begin = event.pos()
+        self.end = event.pos()
+        self.update()
+        self.zoom.scene.setSceneRect((event.pos().x() - 15), (event.pos().y() - 15), 120, 120)
+        self.zoom.show()
+        self.crosshair.show()
+
+    def mouseMoveEvent(self, event):
+        self.end = event.pos()
+        self.update()
+        self.zoom.scene.setSceneRect((event.pos().x() - 15), (event.pos().y() - 15), 120, 120)
+
+    def mouseReleaseEvent(self, event):
+        self.end = event.pos()
+        self.update()
+        self.zoom.hide()
+        self.crosshair.hide()
+        if self.colorsDialog.fill.isChecked():
+            self.colorsDialog.brush = 1
+        else:
+            self.colorsDialog.brush = 0
+        #ensure that we will have exactly a rectangle and not an accidental click
+        if self.toolkit.switch == 1 and abs(self.rectw) >= 2:
+            processing.blur(self.rectw, self.recth, self.rectx, self.recty, SHOTPATH, self.actions)
+            self.redrawImage()
+            self.begin = QtCore.QPoint()
+            self.end = QtCore.QPoint()
+        elif self.toolkit.switch == 2 and self.begin != self.end:
+            processing.circle(self.begin, self.end, self.toolkit.thickness, self.actions, self.colorsDialog.pen, self.colorsDialog.brush)
+            self.redrawImage()
+            self.begin = QtCore.QPoint()
+            self.end = QtCore.QPoint()
+        elif self.toolkit.switch == 3 and self.begin != self.end:
+            processing.drawrectangle(self.begin, self.end, self.toolkit.thickness, self.actions, self.colorsDialog.pen, self.colorsDialog.brush)
+            self.redrawImage()
+            self.begin = QtCore.QPoint()
+            self.end = QtCore.QPoint()
+        elif self.toolkit.switch == 4 and self.begin.x() != self.end.x():
+            processing.drawline(self.begin, self.end, self.toolkit.thickness, self.actions, self.colorsDialog.pen)
+            self.redrawImage()
+            self.begin = QtCore.QPoint()
+            self.end = QtCore.QPoint()
+
+    def wheelEvent(self, event):
+        if event.angleDelta().y() + abs(event.angleDelta().y()) == 0:
+            if self.toolkit.thickness != 1:
+                self.toolkit.thickness -= 1
+        else:
+            if self.toolkit.thickness < 20:
+                self.toolkit.thickness += 1
+        self.toolkit.update_label()
+
+    def keyPressEvent(self, qKeyEvent):
+        if (qKeyEvent.nativeModifiers() == 4 or qKeyEvent.nativeModifiers() == 8196
+        ) and (qKeyEvent.nativeScanCode() == 52):
+        #is responsible for Ctrl-Z both in English and Cyrillic moonspeak
+            shouldi = self.actions.extract()
+            if not shouldi:
+                self.redrawImage()
+        if qKeyEvent.key() == QtCore.Qt.Key_Return:
+            if abs(self.rectw) <= 1 and abs(self.recth) <= 1:
+                processing.convert(self.width, self.height, 0, 0, SHOTPATH)
+                self.closeScreen()
+            else:
+                processing.convert(self.rectw, self.recth, self.rectx, self.recty, SHOTPATH)
+                self.closeScreen()
+        if qKeyEvent.key() == QtCore.Qt.Key_Escape:
+            self.closeScreen()
+        if qKeyEvent.nativeScanCode() == 28: #"T" key
+            if self.toolkit.isopened == 0:
+                self.toolkit.show()
+                self.colorsDialog.show()
+                self.toolkit.isopened = 1
+            else:
+                self.toolkit.hide()
+                self.colorsDialog.hide()
+                self.toolkit.isopened = 0
+        if qKeyEvent.nativeScanCode() == 39: #"S" key
+            self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, SHOTPATH]
+            self.hideScreen()
+            self.table_widget.show()
+        self.update()
+
+class InitListener(QtCore.QThread):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent = parent
+
+    def run(self):
+        while True:
+            if path.isfile("/tmp/chizuhoru.pid.exit"):
+                remove("/tmp/chizuhoru.pid.exit")
+                self.parent.trigger.emit()
+            # python will take all of your CPU if you remove sleep().
+            sleep(1)
+
+class Tray(QtWidgets.QWidget):
+    trigger = QtCore.pyqtSignal()
+    
+    def __init__(self):
+        super().__init__()
+        self.setGeometry(0,0,0,0)
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint | QtCore.Qt.X11BypassWindowManagerHint)
+        self.trigger.connect(self.initScreen)
+        self.initTray()
+        self.initScreen()
+
+    def initScreen(self):
+        self.window = ScreenWindow()
+        self.window.show()
+
+    def initTray(self):
+        self.tray_icon = QtWidgets.QSystemTrayIcon(self)
+        self.tray_icon.setIcon(QtGui.QIcon("{}/src/ico.png".format(sys.path[0])))
+        self.listener = InitListener(parent=self)
+        self.listener.start()
+        show_action = QtWidgets.QAction("Show", self)
+        quit_action = QtWidgets.QAction("Exit", self)
+        show_action.triggered.connect(self.initScreenCheck)
+        quit_action.triggered.connect(self.close)
+        tray_menu = QtWidgets.QMenu()
+        tray_menu.addAction(show_action)
+        tray_menu.addAction(quit_action)
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
+
+    def closeEvent(self, event):
+        if path.isfile(SHOTPATH[0]):
+            remove(SHOTPATH[0])
+        QtWidgets.qApp.quit()
+
+    @QtCore.pyqtSlot()
+    def initScreenCheck(self):
+        if self.window.table_widget.isVisible():
+            print("Dialog already exists")
+        else:
+            self.initScreen()
+
+class SaveDialog(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
+        self.height, self.width = __screen.height(), __screen.width()
+        self.setGeometry((self.width / 2 - 200), (self.height / 2), 400, 290)
+        self.setFixedSize(400, 290)
+        self.setWindowTitle("Save / Upload")
+        
+        self.args = []
+        self.fname = SHOTPATH[1] if (SHOTPATH[1] != None) else ("/home/{}/{}".format(
+            environ['USER'], SHOTNAME))
+        self.initLayout()
+    
+    def initLayout(self):
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.tabs = QtWidgets.QTabWidget()
+        self.tab1 = QtWidgets.QWidget()	
+        self.tab2 = QtWidgets.QWidget()
+        self.tabs.addTab(self.tab1,"Main")
+        self.tabs.addTab(self.tab2,"Upload to host")
+        self.initTabOne()
+        self.initTabTwo()
+        self.layout.addWidget(self.tabs)
+        self.push_settings = QtWidgets.QPushButton("Config")
+        self.push_settings.clicked.connect(self.initConfig)
+        self.layout.addWidget(self.push_settings, QtCore.Qt.AlignRight)
+        self.setLayout(self.layout)
+
+    def initTabOne(self):
+        self.tab1.main_0_layout = QtWidgets.QGridLayout()
+        self.tab1.main_0_wrapper = QtWidgets.QGroupBox()
+        self.tab1.main_0_wrapper.setFixedSize(355, 110)
+        self.tab1.main_0_wrapper.setTitle("Save to")
+        self.tab1.main_0_wrapper.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        self.tab1.main_1_layout = QtWidgets.QHBoxLayout()
+        self.tab1.vertical_wrapper = QtWidgets.QVBoxLayout()
+        self.textbox = QtWidgets.QLineEdit("{}".format(SHOTNAME))
+        self.save = QtWidgets.QPushButton("Browse")
+        self.save.clicked.connect(self.askFilename)
+        self.checktext0 = QtWidgets.QLabel("Copy to clipboard:")
+        self.checkbox0 = QtWidgets.QCheckBox()
+        self.checkbox0.setChecked(True)
+        self.checkbox1 = QtWidgets.QCheckBox()
+        self.checktext1 = QtWidgets.QLabel("Draw a shadow:")
+        self.tab1.main_0_layout.addWidget(self.textbox, 1, 0, 1, 1)
+        self.tab1.main_0_layout.addWidget(self.save, 1, 1, 1, 1)
+        self.tab1.main_0_layout.addWidget(self.checktext0, 2, 0, 1, 1)
+        self.tab1.main_0_layout.addWidget(self.checkbox0, 2, 1, 1, 1)
+        self.tab1.main_0_layout.addWidget(self.checktext1, 3, 0, 1, 1)
+        self.tab1.main_0_layout.addWidget(self.checkbox1, 3, 1, 1, 1)
+        self.donebutton = QtWidgets.QPushButton("Save")
+        self.donebutton.clicked.connect(self.jobIsDone)
+        self.tab1.main_1_layout.addStretch(1)
+        self.tab1.main_1_layout.addWidget(self.donebutton)
+        self.tab1.main_0_wrapper.setLayout(self.tab1.main_0_layout)
+        self.tab1.vertical_wrapper.addWidget(self.tab1.main_0_wrapper)
+        self.tab1.vertical_wrapper.addLayout(self.tab1.main_1_layout)
+        self.tab1.setLayout(self.tab1.vertical_wrapper)
+    
+    def initTabTwo(self):
+        self.tab2.vertical_wrapper = QtWidgets.QVBoxLayout()
+        self.tab2.upload_wrapper = QtWidgets.QGroupBox()
+        self.tab2.upload_wrapper.setTitle("Custom")
+        self.tab2.upload_wrapper.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        self.tab2.upload_hlayouts_wrapper = QtWidgets.QVBoxLayout()
+        self.tab2.upload_0_hlayout = QtWidgets.QHBoxLayout()
+        self.tab2.upload_1_hlayout = QtWidgets.QHBoxLayout()
+        #CUSTOM
+        self.filename_title = QtWidgets.QLabel("Filename:")
+        self.push_filename = QtWidgets.QLineEdit(self)
+        self.push_filename.setText("{}".format(SHOTNAME))
+        self.push_filename.textChanged.connect(self.changeUploadFilename)
+        self.push_image = QtWidgets.QPushButton("Upload")
+        self.push_image.clicked.connect(self.pushUpload)
+        self.push_link = QtWidgets.QLineEdit("Result link")
+        self.push_link.setDisabled(True)
+        for i in [self.filename_title, self.push_filename, self.push_image]:
+            self.tab2.upload_0_hlayout.addWidget(i)
+        self.tab2.upload_1_hlayout.addWidget(self.push_link)
+        self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_0_hlayout)
+        self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_1_hlayout)
+        self.tab2.upload_wrapper.setLayout(self.tab2.upload_hlayouts_wrapper)
+        #IMGUR
+        self.tab2.upload_imgur_wrapper = QtWidgets.QGroupBox()
+        self.tab2.upload_imgur_wrapper.setTitle("Imgur")
+        self.tab2.upload_imgur_wrapper.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        self.tab2.upload_imgur_hlayouts_wrapper = QtWidgets.QVBoxLayout()
+        self.tab2.upload_imgur_0_hlayout = QtWidgets.QHBoxLayout()
+        self.tab2.upload_imgur_1_hlayout = QtWidgets.QHBoxLayout()
+        self.push_imgur_image = QtWidgets.QPushButton("Upload")
+        self.push_imgur_image.clicked.connect(self.pushImgurUpload)
+        self.push_imgur_link = QtWidgets.QLineEdit("Result link")
+        self.push_imgur_link.setDisabled(True)
+        self.tab2.upload_imgur_0_hlayout.addWidget(self.push_imgur_image)
+        self.tab2.upload_imgur_1_hlayout.addWidget(self.push_imgur_link)
+        self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_0_hlayout)
+        self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_1_hlayout)
+        self.tab2.upload_imgur_wrapper.setLayout(self.tab2.upload_imgur_hlayouts_wrapper)
+        self.checkbox_tab2 = QtWidgets.QCheckBox()
+        self.checktext_tab2 = QtWidgets.QLabel("Draw a shadow:")
+        self.tab2.shadowHLayout = QtWidgets.QHBoxLayout()
+        self.tab2.shadowHLayout.addWidget(self.checktext_tab2)
+        self.tab2.shadowHLayout.addWidget(self.checkbox_tab2)
+        self.tab2.shadowHLayout.addStretch(1)
+        self.tab2.vertical_wrapper.addLayout(self.tab2.shadowHLayout)
+        self.tab2.vertical_wrapper.addWidget(self.tab2.upload_wrapper)
+        self.tab2.vertical_wrapper.addWidget(self.tab2.upload_imgur_wrapper)
+        self.tab2.setLayout(self.tab2.vertical_wrapper)
+    
+    def initConfig(self):
+        self.config = EditConfig()
+
+    def closeEvent(self, event):
+        self.close()
+        if path.isfile(SHOTPATH[0]):
+            remove(SHOTPATH[0])
+
+    @QtCore.pyqtSlot()
+    def askFilename(self):
+        self.fname = self.fname if isinstance(self.fname, str) else self.fname[0]
+        self.fname = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
+        self.textbox.setStyleSheet("")
+        self.textbox.setText(self.fname[0])
+
+    def jobIsDone(self):
+        global SHOTPATH, SHOTNAME
+        self.clip = 1 if self.checkbox0.isChecked() else 0
+        self.shadow = 1 if self.checkbox1.isChecked() else 0
+        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
+        SHOTPATH[1] = self.fname if isinstance(self.fname, str) else self.fname[0]
+        try:
+            if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
+                processing.convert(self.width, self.height, 0, 0, SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
+                self.close()
+            else:
+                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
+                self.close()
+        except ValueError as e:
+            pass
+        except PermissionError:
+            self.textbox.setText("Permission denied")
+            self.textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+
+    def changeUploadFilename(self):
+        global SHOTNAME
+        SHOTNAME = self.push_filename.text()
+
+    def pushUpload(self):
+        global SHOTPATH, SHOTNAME
+        self.shadow = 1 if self.checkbox_tab2.isChecked() else 0
+        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
+        customArgs = [config.userCustomAccessToken, config.userCustomUsername, config.userCustomPassword, config.userCustomName,
+        config.userCustomLink]
+        try:
+            if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
+                processing.convert(self.width, self.height, 0, 0, SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+            else:
+                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+            result = processing.custom_upload(SHOTPATH[0], SHOTNAME, customArgs)
+            self.push_link.setDisabled(False)
+            self.push_link.setText(result)
+            self.push_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
+            self.tab2.upload_imgur_wrapper.setEnabled(False)
+        except processing.requests.exceptions.ConnectionError as e:
+            self.push_link.setText("Connection error: {}".format(e))
+            self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+        except processing.NoLinkException as e:
+            self.push_link.setDisabled(False)
+            self.push_link.setText("Error: link is empty or invalid")
+            self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")          
+
+    def pushImgurUpload(self):
+        global SHOTPATH
+        self.shadow = 1 if self.checkbox_tab2.isChecked() else 0
+        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
+        customArgs = [config.userImgurID, config.userImgurLink]
+        try:
+            if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
+                processing.convert(self.width, self.height, 0, 0, SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+            else:
+                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+            result = processing.imgur_upload(SHOTPATH[0], customArgs)
+            self.push_imgur_link.setDisabled(False)
+            self.push_imgur_link.setText(result)
+            self.push_imgur_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
+            self.push_imgur_image.setDisabled(True)
+            self.tab2.upload_wrapper.setEnabled(False)
+        except processing.requests.exceptions.ConnectionError as e:
+            self.push_imgur_link.setDisabled(False)
+            self.push_imgur_link.setText("Connection error: {}".format(e))
+            self.push_imgur_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+        except processing.NoLinkException as e:
+            self.push_link.setDisabled(False)
+            self.push_link.setText("Error: link is empty or invalid")
+            self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")   
+
+class EditConfig(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
+        self.height, self.width = __screen.height(), __screen.width()
+        self.setGeometry((self.width / 2 - 200), (self.height / 2 - 180), 400, 360)
+        self.setFixedSize(400, 360)
+        self.setWindowTitle("Configuration")
+        self.initLayout()
+        self.show()
+
+    def initLayout(self):
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.shadows_config = QtWidgets.QGroupBox()
+        self.custom_config = QtWidgets.QGroupBox()
+        self.shadows_config.setTitle("Shadows")
+        self.custom_config.setTitle("Custom upload")
+        self.shadows_config.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        self.custom_config.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        #SHADOWS
+        self.shadows_v = QtWidgets.QVBoxLayout()
+        self.shadows_h0 = QtWidgets.QHBoxLayout()
+        self.shadows_h1 = QtWidgets.QHBoxLayout()
+        self.shadows_h2 = QtWidgets.QHBoxLayout()
+        self.free_space = QtWidgets.QSpinBox()
+        self.free_space.setRange(10, 140)
+        self.free_space.setValue(config.userSpace)
+        self.free_space.valueChanged[int].connect(self.changeFreeSpace)
+        self.free_space_label = QtWidgets.QLabel("Offset from image:")
+        self.shadow_size = QtWidgets.QSpinBox()
+        self.shadow_size.setRange(15, 45)
+        self.shadow_size.setValue(config.userShadowSize)
+        self.shadow_size.valueChanged.connect(self.changeShadowSize)
+        self.shadow_size_label = QtWidgets.QLabel("Shadow size:")
+        self.iterations = QtWidgets.QSpinBox()
+        self.iterations.setRange(15, 150)
+        self.iterations.setValue(config.userIterations)
+        self.iterations.valueChanged.connect(self.changeIterations)
+        self.iterations_label = QtWidgets.QLabel("Shadow blur:")
+        self.shadows_h0.addWidget(self.free_space_label)
+        self.shadows_h0.addWidget(self.free_space)
+        self.shadows_h1.addWidget(self.shadow_size_label)
+        self.shadows_h1.addWidget(self.shadow_size)
+        self.shadows_h2.addWidget(self.iterations_label)
+        self.shadows_h2.addWidget(self.iterations)
+        self.shadows_v.addLayout(self.shadows_h0)
+        self.shadows_v.addLayout(self.shadows_h1)
+        self.shadows_v.addLayout(self.shadows_h2)
+        self.shadows_config.setLayout(self.shadows_v)
+        #CUSTOM UPLOAD
+        self.custom_v = QtWidgets.QVBoxLayout()
+        self.custom_h0, self.custom_h1, self.custom_h2, self.custom_h3, self.custom_h4, self.custom_h5 = [
+            QtWidgets.QHBoxLayout() for i in range(0, 6)
+        ]
+        self.custom_access_token = QtWidgets.QLineEdit(config.userCustomAccessToken)
+        self.custom_access_token.textChanged.connect(self.changeAPIKey)
+        self.custom_access_token_label = QtWidgets.QLabel("Access token (in form 'headername MYTOKEN')")
+        self.custom_access_token_description = QtWidgets.QLabel("Example: token yBj23soANO")
+        self.custom_username = QtWidgets.QLineEdit(config.userCustomUsername)
+        self.custom_username.textChanged.connect(self.changeCustomUsername)
+        self.custom_username_label = QtWidgets.QLabel("Username:")
+        self.custom_password = QtWidgets.QLineEdit(config.userCustomPassword)
+        self.custom_password.textChanged.connect(self.changeCustomPassword)
+        self.custom_password_label = QtWidgets.QLabel("Password:")
+        self.custom_screenshot_name = QtWidgets.QSpinBox()
+        self.custom_screenshot_name.setRange(0, 1)
+        self.custom_screenshot_name.setValue(config.userCustomName)
+        self.custom_screenshot_name.valueChanged.connect(self.changeScreenshotName)
+        self.custom_screenshot_name_label = QtWidgets.QLabel("Send filename:")
+        self.custom_link = QtWidgets.QLineEdit(config.userCustomLink)
+        self.custom_link.textChanged.connect(self.changeCustomLink)
+        self.custom_link_label = QtWidgets.QLabel("Custom link:")
+        self.custom_h0.addWidget(self.custom_access_token_label, QtCore.Qt.AlignLeft)
+        self.custom_h0.addWidget(self.custom_access_token, QtCore.Qt.AlignRight)
+        self.custom_h1.addWidget(self.custom_access_token_description)
+        self.custom_h2.addWidget(self.custom_username_label, QtCore.Qt.AlignLeft)
+        self.custom_h2.addWidget(self.custom_username, QtCore.Qt.AlignRight)
+        self.custom_h3.addWidget(self.custom_password_label, QtCore.Qt.AlignLeft)
+        self.custom_h3.addWidget(self.custom_password, QtCore.Qt.AlignRight)
+        self.custom_h4.addWidget(self.custom_screenshot_name_label, QtCore.Qt.AlignLeft)
+        self.custom_h4.addWidget(self.custom_screenshot_name, QtCore.Qt.AlignRight)
+        self.custom_h5.addWidget(self.custom_link_label, QtCore.Qt.AlignLeft)
+        self.custom_h5.addWidget(self.custom_link, QtCore.Qt.AlignRight)
+        self.custom_v.addLayout(self.custom_h0)
+        self.custom_v.addLayout(self.custom_h1)
+        self.custom_v.addLayout(self.custom_h2)
+        self.custom_v.addLayout(self.custom_h3)
+        self.custom_v.addLayout(self.custom_h4)
+        self.custom_v.addLayout(self.custom_h5)
+        self.custom_config.setLayout(self.custom_v)
+
+        self.layout.addWidget(self.shadows_config)
+        self.layout.addWidget(self.custom_config)
+        self.setLayout(self.layout)
+
+    @QtCore.pyqtSlot()
+    def changeFreeSpace(self):
+        config.changeConfig("shadows", "space", self.free_space.value())
+
+    def changeShadowSize(self):
+        config.changeConfig("shadows", "shadow_space", self.shadow_size.value())
+
+    def changeIterations(self):
+        config.changeConfig("shadows", "iterations", self.iterations.value())
+    
+    def changeAPIKey(self):
+        config.changeConfig("custom", "access_token", self.custom_access_token.text())
+    
+    def changeCustomUsername(self):
+        config.changeConfig("custom", "username", self.custom_username.text())
+    
+    def changeCustomPassword(self):
+        config.changeConfig("custom", "password", self.custom_password.text())
+    
+    def changeScreenshotName(self):
+        if self.custom_screenshot_name.value() == 1:
+            value = True
+        else:
+            value = False
+        config.changeConfig("custom", "name", value)
+    
+    def changeCustomLink(self):
+        config.changeConfig("custom", "link", self.custom_link.text())
+
+
+class ReadConfig(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        if path.isfile("./config"):
+            with open("config", "r") as file:
+                self.data = file.read()
+                self.parse = json.loads(self.data)
+                self.initValues()
+        else:
+            with open("config", "w") as file:
+                self.parse = {"config": {"shadows": {"space": 84, "shadow_space": 20, "iterations": 46}, 
+                "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, 
+                "link": "None"},
+                "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image"}}}
+                file.write(str(json.dumps(self.parse)))
+                self.initValues()
+
+    def initValues(self):
+        self.userSpace = self.parse["config"]["shadows"]["space"]
+        self.userShadowSize = self.parse["config"]["shadows"]["shadow_space"]
+        self.userIterations = self.parse["config"]["shadows"]["iterations"]
+
+        self.userCustomAccessToken = self.parse["config"]["custom"]["access_token"]
+        self.userCustomUsername = self.parse["config"]["custom"]["username"]
+        self.userCustomPassword = self.parse["config"]["custom"]["password"]
+        self.userCustomName = self.parse["config"]["custom"]["name"]
+        self.userCustomLink = self.parse["config"]["custom"]["link"]
+
+        self.userImgurID = self.parse["config"]["imgur"]["client_id"]
+        self.userImgurLink = self.parse["config"]["imgur"]["link"]
+
+    def changeConfig(self, section, undersection, value):
+        self.parse["config"][section][undersection] = value
+        with open("config", "w") as file:
+            towrite = str(json.dumps(self.parse))
+            file.write(towrite)
+        self.initValues()
+         
+if __name__ == '__main__':
+    pid = str(getpid())
+    pidfile = "/tmp/chizuhoru.pid"
+    pidfile_exit = pidfile + ".exit"
+    if path.isfile(pidfile_exit):
+        sys.exit(0)
+    try:
+        if path.isfile(pidfile):
+            try:
+                with open(pidfile, 'r') as testcheck:
+                    kill(int(testcheck.read()), 0)
+            except OSError:
+                remove(pidfile)
+            else:
+                print("Another instance is running: {}".format(pid))
+                with open(pidfile_exit, 'w') as file:
+                    pass
+                sys.exit(0)
+        with open(pidfile, 'w') as file:
+            file.write(pid)
+    except PermissionError as e:
+        print("Error writing to '{}':".format(pidfile), e)
+        sys.exit(1)
+    try:
+        ap = ArgumentParser()
+        ap.add_argument("-s", "--screenshot", required=False, action='store_true',
+        help="take a full screen shot")
+        ap.add_argument("-d", "--directory", required=False,
+        help="Directory to save a screenshot. If not provided, clipboard only is used.")
+        args = vars(ap.parse_args())
+        if args["directory"]:
+            SHOTPATH[1] = "{}/{}".format(args["directory"], SHOTNAME)
+        if args["screenshot"] == True and not args["directory"]:
+            processing.scrot(SHOTPATH[0])
+            subprocess.call(["xclip", "-sel", "clip", "-t", "image/png", SHOTPATH[0]])
+        elif args["screenshot"] == True and args["directory"]:
+            processing.scrot(SHOTPATH[1])
+        else:
+            app = QtWidgets.QApplication(sys.argv)
+            config = ReadConfig()
+            stayInTray = Tray()
+            stayInTray.show()
+            app.aboutToQuit.connect(app.deleteLater)
+            sys.exit(app.exec_())
+    finally:
+        unlink(pidfile)

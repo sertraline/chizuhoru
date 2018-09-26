@@ -13,14 +13,12 @@
 ### Packages
 
 - Python **3.7**
-  + `apt install python3-pyqt5 pyqt5-dev-tools` for Ubuntu/Debian
-  + `pacman -S pyqt5-common python-pyqt5` for Arch Linux
 - XClip (read [Clipboard persistence](https://wiki.ubuntu.com/ClipboardPersistence) )
   + `apt install xclip` for Ubuntu/Debian
   + `pacman -S xclip` for Arch Linux
 - PyQt5
-  + `apt install python3-pyqt5` for Ubuntu
-  + `pacman -S python-pyqt5` for Arch Linux
+  + `apt install python3-pyqt5 pyqt5-dev-tools` for Ubuntu/Debian
+  + `pacman -S pyqt5-common python-pyqt5` for Arch Linux
 
 ### Modules
 
@@ -31,8 +29,9 @@
 - Python Aggdraw
   + `python3 -m pip install aggdraw` 
 - Requests
-  + `python3 -m pip install requests`
-- You can also easily install these modules by running `python3 -m pip install -r requirements.txt`.
+  + `python3 -m pip install requests`  
+  
+You can also easily install these modules by running `python3 -m pip install -r requirements.txt`.
 
 Also it needs a composer to support transparency effects. If you are running DE, you will have one already. I'm running only WM, so I use compton.
 

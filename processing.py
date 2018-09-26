@@ -152,12 +152,12 @@ def drawline(begin, end, thickness, actions, pen):
 def drawshadow(shot, space=84, shadow_space=20, iterations=46):
     free_space = space - shadow_space
     side_space = free_space//2
-    background = "#ffffff"
+    background = (255, 255, 255, 0)
     shadow = "#707070"
     image = shot
     completeWidth = image.size[0] + space
     completeHeight = image.size[1] + space
-    back = Image.new(image.mode, (completeWidth, completeHeight), background)
+    back = Image.new("RGBA", (completeWidth, completeHeight), background)
     back.paste(shadow, [side_space, side_space, (completeWidth - side_space), (completeHeight - side_space)])
     counter = 0
     while counter < iterations:

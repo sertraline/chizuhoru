@@ -149,20 +149,18 @@ def drawline(begin, end, thickness, actions, pen):
     used.flush()
     img.save(SHOTPATH[0])
 
-def drawshadow(shot, space=84, shadow_space=20, iterations=46):
+def drawshadow(image, space=84, shadow_space=20, iterations=46):
+    #https://code.activestate.com/recipes/474116-drop-shadows-with-pil/ this helped me much
     free_space = space - shadow_space
     side_space = free_space//2
     background = (255, 255, 255, 0)
     shadow = "#707070"
-    image = shot
     completeWidth = image.size[0] + space
     completeHeight = image.size[1] + space
     back = Image.new("RGBA", (completeWidth, completeHeight), background)
     back.paste(shadow, [side_space, side_space, (completeWidth - side_space), (completeHeight - side_space)])
-    counter = 0
-    while counter < iterations:
+    for i in range(0, iterations):
         back = back.filter(ImageFilter.BLUR)
-        counter += 1   
     back.paste(image, ((side_space+shadow_space//2), side_space))
     return back
 

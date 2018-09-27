@@ -1,4 +1,7 @@
-## Chizuhoru - screenshot tool for Linux
+## Chizuhoru - screenshot tool for Linux  
+
+<img align="right" width="400" height="300" src="https://i.imgur.com/OqXmdJA.png">  
+
 
 ## Features:
 

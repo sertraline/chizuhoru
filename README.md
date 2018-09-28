@@ -107,6 +107,3 @@ I don't know, except for Arch Xfce/Openbox and Linux Mint Xfce. Neither I don't 
 
 **Q**: Why Python?  
 **A**: uhhhhhhhhhhh...  
-
-
-Icon is not mine, so all rights to this art belong to the [owner](http://theawkwardyeti.com/about/).

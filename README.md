@@ -83,6 +83,7 @@ Now I can call Chizuhoru with PrintScreen hotkey.
 | <kbd>Esc</kbd>                                                            | Exit                             |
 | <kbd>Enter</kbd> | Copy selected rectangle to clipboard. If there is no selection, fullscreen will be copied |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd>                                            | Undo                             |
+| <kbd>Mouse wheel</kbd>                                                    | Increase/decrease tool thickness |
 
 ## Compiling
 

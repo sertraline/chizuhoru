@@ -94,9 +94,14 @@ Compiling python script saves some time at its first launch. You can do that by 
   
 Now you can check your `__pycache__` directory for the .pyc files.
 
-## Where it works
+## Working with
 
-I don't know, except for Arch Xfce/Openbox and Linux Mint Xfce. Neither I don't know if custom uploads work: I tested it only with plain text and html response.
+Environments checked:  
+
+- i3 WM
+- Openbox WM
+- XFCE
+- Deepin DE
 
 ## TODO
 

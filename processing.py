@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import mss
+import mss, mss.tools
 import aggdraw
 from subprocess import call
 from copy import copy
@@ -9,9 +9,11 @@ from PIL import Image, ImageFilter, ImageDraw
 import json
 import re
 import requests
+from io import BytesIO
 
-SHOTNAME = "{}.png".format(datetime.now().strftime("%d_%b_%Y_%H:%M:%S"))
+SHOTNAME = "{}.png".format(datetime.now().strftime("%d-%b-%Y_%H-%M-%S"))
 SHOTPATH = ["/tmp/{}".format(SHOTNAME), None]
+TEMP = ''
 
 class Stack:
     def __init__(self):
@@ -21,38 +23,46 @@ class Stack:
         return self.items == []
 
     def push(self, item):
-        if len(self.items) < 10:
+        if len(self.items) < 25:
             self.items.append(item)
         else:
             self.pop()
             self.items.append(item)
             
     def pop(self):
-        self.items.reverse()
-        self.items.pop()
-        self.items.reverse()
+        del self.items[0]
 
     def extract(self):
+        global TEMP
         if not self.isEmpty():
-            item = self.items[(len(self.items) - 1)]
-            item.save(SHOTPATH[0])
+            TEMP = self.items[(len(self.items) - 1)]
             self.items.pop()
 
 class NoLinkException(Exception):
     pass
 
-def scrot(path):
+def scrot(path=""):
+    global TEMP
     sct = mss.mss()
-    try:
-        filename = sct.shot(mon=-1, output=path)
-    except PermissionError as e:
-        print("Error writting to '{}':".format(path), e)
-        sys.exit(1)
+    if path:
+        try:
+            filename = sct.shot(mon=-1, output=path)
+        except PermissionError as e:
+            print(f"Error writting to '{path}': {e}")
+            sys.exit(1)
+    else:
+        mon = sct.monitors[1]
+        shot = sct.grab(mon)
+        raw_bytes = mss.tools.to_png(shot.rgb, shot.size)
+        img = Image.open(BytesIO(raw_bytes))
+        TEMP = img
+
 
 def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, shadowargs=[]):
     """Crops an image with given coordinates of selected rectangle; if
     no rectangle given, saves the image to the clipboard."""
-    img = Image.open(SHOTPATH[0])
+    global TEMP
+    img = TEMP
     if not "-" in str(rectwidth) and "-" not in str(rectheight):
         crop = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
     else:
@@ -76,13 +86,14 @@ def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, sha
 
 def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
     """Blurs a rectangle with given coordinates"""
-    img = Image.open(SHOTPATH[0])
+    global TEMP
+    img = TEMP
     actions.push(copy(img))
     if not "-" in str(rectwidth) and "-" not in str(rectheight):
         filt = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        filt = filt.filter(ImageFilter.BLUR)
+        filt = filt.filter(ImageFilter.GaussianBlur(radius=4))
         img.paste(filt, (rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        img.save(SHOTPATH[0])
+        TEMP = img
     else:
         if "-" in str(rectwidth):
             rectx = rectx + rectwidth
@@ -91,13 +102,14 @@ def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
             recty = recty + rectheight
             rectheight = abs(rectheight)
         filt = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        filt = filt.filter(ImageFilter.BLUR)
+        filt = filt.filter(ImageFilter.GaussianBlur(radius=4))
         img.paste(filt, (rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        img.save(SHOTPATH[0])
+        TEMP = img
 
 def circle(begin, end, thickness, actions, pen, brush):
     """Draws a circle using aggdraw module"""
-    img = Image.open(SHOTPATH[0])
+    global TEMP
+    img = TEMP
     actions.push(copy(img))
     used = aggdraw.Draw(img)
     apen = aggdraw.Pen(pen, width=thickness)
@@ -115,11 +127,12 @@ def circle(begin, end, thickness, actions, pen, brush):
     else:
         used.ellipse((x0, y0, x1, y1), apen)
     used.flush()
-    img.save(SHOTPATH[0])
+    TEMP = img
 
 def drawrectangle(begin, end, thickness, actions, pen, brush):
     """Draws a rectangle using aggdraw module"""
-    img = Image.open(SHOTPATH[0])
+    global TEMP
+    img = TEMP
     actions.push(copy(img))
     used = aggdraw.Draw(img)
     apen = aggdraw.Pen(pen, width=thickness)
@@ -136,31 +149,32 @@ def drawrectangle(begin, end, thickness, actions, pen, brush):
     else:
         used.rectangle((x0, y0, x1, y1), apen)
     used.flush()
-    img.save(SHOTPATH[0])
+    TEMP = img
 
 def drawline(begin, end, thickness, actions, pen):
     """Draws a line using aggdraw module"""
-    img = Image.open(SHOTPATH[0])
+    global TEMP
+    img = TEMP
     actions.push(copy(img))
     used = aggdraw.Draw(img)
     apen = aggdraw.Pen(pen, width=thickness)
     x0, y0, x1, y1 = (begin.x(), begin.y(), end.x(), end.y())
     used.line((x0, y0, x1, y1), apen)
     used.flush()
-    img.save(SHOTPATH[0])
+    TEMP = img
 
-def drawshadow(image, space=84, shadow_space=20, iterations=46):
+def drawshadow(image, space=130, shadow_space=10, iterations=12):
     #https://code.activestate.com/recipes/474116-drop-shadows-with-pil/ this helped me much
     free_space = space - shadow_space
     side_space = free_space//2
-    background = (255, 255, 255, 0)
-    shadow = "#707070"
+    background = (0, 0, 0, 0)
+    shadow = "#202020"
     completeWidth = image.size[0] + space
     completeHeight = image.size[1] + space
     back = Image.new("RGBA", (completeWidth, completeHeight), background)
     back.paste(shadow, [side_space, side_space, (completeWidth - side_space), (completeHeight - side_space)])
     for i in range(0, iterations):
-        back = back.filter(ImageFilter.BLUR)
+        back = back.filter(ImageFilter.GaussianBlur(6))
     back.paste(image, ((side_space+shadow_space//2), side_space))
     return back
 
@@ -223,4 +237,5 @@ def imgur_upload(shotpath, customArgs):
     }
     response = requests.post(imgur_link, headers=headers, files=files)
     jtext = json.loads(response.text)
+    call(f"echo {jtext['data']['link']} | xclip -sel clip", shell=True)
     return jtext["data"]["link"]

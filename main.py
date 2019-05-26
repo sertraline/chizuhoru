@@ -5,38 +5,37 @@ from argparse import ArgumentParser
 from os import remove, path, getpid, environ, unlink, kill
 from PyQt5.QtGui import QPainter, QImage, QPalette, QBrush
 from PyQt5 import QtCore, QtGui, QtWidgets
-from processing import SHOTNAME, SHOTPATH
 from PyQt5.QtCore import QSize, Qt
+
+from PIL.ImageQt import ImageQt
+
 import json
 import overlay
 import processing
-import subprocess
 
 class ScreenWindow(overlay.BaseLayer):
     def __init__(self):
         super().__init__()
-        global SHOTNAME, SHOTPATH
+        processing.scrot()
         #update screenshot name and path
-        SHOTNAME = "{}.png".format(processing.datetime.now().strftime("%d_%b_%Y_%H:%M:%S"))
-        SHOTPATH[0] = "/tmp/{}".format(SHOTNAME)
+        processing.SHOTNAME = fr"{processing.datetime.now().strftime('%d-%b-%Y_%H-%M-%S')}.png"
+        processing.SHOTPATH[0] = f"/tmp/{processing.SHOTNAME}"
         if args["directory"] != None:
-            SHOTPATH[1] = "{}/{}".format(args["directory"], SHOTNAME)
+            processing.SHOTPATH[1] = f"{args['directory']}/{SHOTNAME}"
         else:
-            SHOTPATH[1] = None
-        processing.scrot(SHOTPATH[0])
+            processing.SHOTPATH[1] = None
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
 
         self.table_widget = SaveDialog()
         self.showFullScreen()
-        self.zoom = overlay.LoopZoop()
-        self.crosshair = overlay.Crosshair()
         self.toolkit = overlay.Toolkit()
         self.colorsDialog = overlay.LePalette()
         self.background()
         self.actions = processing.Stack()
 
     def background(self):
-        oImage = QImage(SHOTPATH[0])
+        img = ImageQt(processing.TEMP)
+        oImage = QImage(img)
         sImage = oImage.scaled(QSize(self.width,self.height))
         palette = QPalette()
         palette.setBrush(10, QBrush(sImage))
@@ -65,8 +64,8 @@ class ScreenWindow(overlay.BaseLayer):
         self.update()
 
     def closeScreen(self):
-        if path.isfile(SHOTPATH[0]):
-            remove(SHOTPATH[0])
+        if path.isfile(processing.SHOTPATH[0]):
+            remove(processing.SHOTPATH[0])
         self.close()
         self.toolkit.close()
         self.colorsDialog.close()
@@ -80,27 +79,21 @@ class ScreenWindow(overlay.BaseLayer):
         self.begin = event.pos()
         self.end = event.pos()
         self.update()
-        self.zoom.scene.setSceneRect((event.pos().x() - 15), (event.pos().y() - 15), 120, 120)
-        self.zoom.show()
-        self.crosshair.show()
 
     def mouseMoveEvent(self, event):
         self.end = event.pos()
         self.update()
-        self.zoom.scene.setSceneRect((event.pos().x() - 15), (event.pos().y() - 15), 120, 120)
 
     def mouseReleaseEvent(self, event):
         self.end = event.pos()
         self.update()
-        self.zoom.hide()
-        self.crosshair.hide()
         if self.colorsDialog.fill.isChecked():
             self.colorsDialog.brush = 1
         else:
             self.colorsDialog.brush = 0
         #ensure that we will have exactly a rectangle and not an accidental click
         if self.toolkit.switch == 1 and abs(self.rectw) >= 2:
-            processing.blur(self.rectw, self.recth, self.rectx, self.recty, SHOTPATH, self.actions)
+            processing.blur(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH, self.actions)
             self.redrawImage()
             self.begin = QtCore.QPoint()
             self.end = QtCore.QPoint()
@@ -138,10 +131,10 @@ class ScreenWindow(overlay.BaseLayer):
                 self.redrawImage()
         if qKeyEvent.key() == QtCore.Qt.Key_Return:
             if abs(self.rectw) <= 1 and abs(self.recth) <= 1:
-                processing.convert(self.width, self.height, 0, 0, SHOTPATH)
+                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH)
                 self.closeScreen()
             else:
-                processing.convert(self.rectw, self.recth, self.rectx, self.recty, SHOTPATH)
+                processing.convert(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH)
                 self.closeScreen()
         if qKeyEvent.key() == QtCore.Qt.Key_Escape:
             self.closeScreen()
@@ -155,7 +148,7 @@ class ScreenWindow(overlay.BaseLayer):
                 self.colorsDialog.hide()
                 self.toolkit.isopened = 0
         if qKeyEvent.nativeScanCode() == 39: #"S" key
-            self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, SHOTPATH]
+            self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
             self.hideScreen()
             self.table_widget.show()
         self.update()
@@ -190,7 +183,7 @@ class Tray(QtWidgets.QWidget):
 
     def initTray(self):
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QtGui.QIcon("{}/src/ico.png".format(sys.path[0])))
+        self.tray_icon.setIcon(QtGui.QIcon(f"{sys.path[0]}/src/ico.png"))
         self.listener = InitListener(parent=self)
         self.listener.start()
         show_action = QtWidgets.QAction("Show", self)
@@ -204,8 +197,8 @@ class Tray(QtWidgets.QWidget):
         self.tray_icon.show()
 
     def closeEvent(self, event):
-        if path.isfile(SHOTPATH[0]):
-            remove(SHOTPATH[0])
+        if path.isfile(processing.SHOTPATH[0]):
+            remove(processing.SHOTPATH[0])
         QtWidgets.qApp.quit()
 
     @QtCore.pyqtSlot()
@@ -225,8 +218,8 @@ class SaveDialog(QtWidgets.QWidget):
         self.setWindowTitle("Save / Upload")
         
         self.args = []
-        self.fname = SHOTPATH[1] if (SHOTPATH[1] != None) else ("/home/{}/{}".format(
-            environ['USER'], SHOTNAME))
+        self.fname = processing.SHOTPATH[1] if (processing.SHOTPATH[1] != None) else (
+            f"/home/{environ['USER']}/{processing.SHOTNAME}")
         self.initLayout()
     
     def initLayout(self):
@@ -253,21 +246,22 @@ class SaveDialog(QtWidgets.QWidget):
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         self.tab1.main_1_layout = QtWidgets.QHBoxLayout()
         self.tab1.vertical_wrapper = QtWidgets.QVBoxLayout()
-        self.textbox = QtWidgets.QLineEdit("{}".format(SHOTNAME))
+        self.textbox = QtWidgets.QLineEdit(f"{processing.SHOTNAME}")
+        self.textbox.textChanged.connect(self.changeTextboxFilename)
         self.save = QtWidgets.QPushButton("Browse")
         self.save.clicked.connect(self.askFilename)
         self.checktext0 = QtWidgets.QLabel("Copy to clipboard:")
         self.checkbox0 = QtWidgets.QCheckBox()
         self.checkbox0.setChecked(True)
         self.checkbox1 = QtWidgets.QCheckBox()
-        self.checktext1 = QtWidgets.QLabel("Draw a shadow:")
+        self.checktext1 = QtWidgets.QLabel("Draw shadows:")
         self.tab1.main_0_layout.addWidget(self.textbox, 1, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.save, 1, 1, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checktext0, 2, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checkbox0, 2, 1, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checktext1, 3, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checkbox1, 3, 1, 1, 1)
-        self.donebutton = QtWidgets.QPushButton("Save")
+        self.donebutton = QtWidgets.QPushButton("Save and quit")
         self.donebutton.clicked.connect(self.jobIsDone)
         self.tab1.main_1_layout.addStretch(1)
         self.tab1.main_1_layout.addWidget(self.donebutton)
@@ -288,7 +282,7 @@ class SaveDialog(QtWidgets.QWidget):
         #CUSTOM
         self.filename_title = QtWidgets.QLabel("Filename:")
         self.push_filename = QtWidgets.QLineEdit(self)
-        self.push_filename.setText("{}".format(SHOTNAME))
+        self.push_filename.setText(f"{processing.SHOTNAME}")
         self.push_filename.textChanged.connect(self.changeUploadFilename)
         self.push_image = QtWidgets.QPushButton("Upload")
         self.push_image.clicked.connect(self.pushUpload)
@@ -318,7 +312,7 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_1_hlayout)
         self.tab2.upload_imgur_wrapper.setLayout(self.tab2.upload_imgur_hlayouts_wrapper)
         self.checkbox_tab2 = QtWidgets.QCheckBox()
-        self.checktext_tab2 = QtWidgets.QLabel("Draw a shadow:")
+        self.checktext_tab2 = QtWidgets.QLabel("Draw shadows:")
         self.tab2.shadowHLayout = QtWidgets.QHBoxLayout()
         self.tab2.shadowHLayout.addWidget(self.checktext_tab2)
         self.tab2.shadowHLayout.addWidget(self.checkbox_tab2)
@@ -333,28 +327,35 @@ class SaveDialog(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         self.close()
-        if path.isfile(SHOTPATH[0]):
-            remove(SHOTPATH[0])
+        if path.isfile(processing.SHOTPATH[0]):
+            remove(processing.SHOTPATH[0])
 
     @QtCore.pyqtSlot()
     def askFilename(self):
         self.fname = self.fname if isinstance(self.fname, str) else self.fname[0]
         self.fname = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
         self.textbox.setStyleSheet("")
-        self.textbox.setText(self.fname[0])
+        path = self.fname[0] if '.png' in self.fname[0].lower() else self.fname[0]+'.png'
+        self.textbox.setText(path)
+
 
     def jobIsDone(self):
-        global SHOTPATH, SHOTNAME
         self.clip = 1 if self.checkbox0.isChecked() else 0
         self.shadow = 1 if self.checkbox1.isChecked() else 0
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
-        SHOTPATH[1] = self.fname if isinstance(self.fname, str) else self.fname[0]
+        filename = self.fname if isinstance(self.fname, str) else self.fname[0]
+        filename = filename if '.png' in filename.lower() else filename+'.png'
+        if not '/' in filename:
+            filename = f"/home/{environ['USER']}/" + filename
+        if '~/' in filename:
+            filename = filename.replace('~/', f"/home/{environ['USER']}/")
+        processing.SHOTPATH[1] = filename
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
-                processing.convert(self.width, self.height, 0, 0, SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
+                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
                 self.close()
             else:
-                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
+                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
                 self.close()
         except ValueError as e:
             pass
@@ -362,30 +363,32 @@ class SaveDialog(QtWidgets.QWidget):
             self.textbox.setText("Permission denied")
             self.textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
+    def changeTextboxFilename(self):
+        new_name = self.textbox.text()
+        self.fname = self.textbox.text()
+
     def changeUploadFilename(self):
-        global SHOTNAME
-        SHOTNAME = self.push_filename.text()
+        processing.SHOTNAME = self.push_filename.text()
 
     def pushUpload(self):
-        global SHOTPATH, SHOTNAME
         self.shadow = 1 if self.checkbox_tab2.isChecked() else 0
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
         customArgs = [config.userCustomAccessToken, config.userCustomUsername, config.userCustomPassword, config.userCustomName,
         config.userCustomLink]
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
-                processing.convert(self.width, self.height, 0, 0, SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             else:
-                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
-            result = processing.custom_upload(SHOTPATH[0], SHOTNAME, customArgs)
-            self.tab1.setDisabled(True)
-            self.push_image.setDisabled(True)
+                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+            result = processing.custom_upload(processing.SHOTPATH[0], processing.SHOTNAME, customArgs)
+            #self.tab1.setDisabled(True)
+            #self.push_image.setDisabled(True)
             self.push_link.setDisabled(False)
             self.push_link.setText(result)
             self.push_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
             self.tab2.upload_imgur_wrapper.setEnabled(False)
         except processing.requests.exceptions.ConnectionError as e:
-            self.push_link.setText("Connection error: {}".format(e))
+            self.push_link.setText(f"Connection error: {e}")
             self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")
         except processing.NoLinkException as e:
             self.push_link.setDisabled(False)
@@ -393,29 +396,29 @@ class SaveDialog(QtWidgets.QWidget):
             self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")          
 
     def pushImgurUpload(self):
-        global SHOTPATH
         self.shadow = 1 if self.checkbox_tab2.isChecked() else 0
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
         customArgs = [config.userImgurID, config.userImgurLink]
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
-                processing.convert(self.width, self.height, 0, 0, SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             else:
-                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
-            result = processing.imgur_upload(SHOTPATH[0], customArgs)
-            self.tab1.setDisabled(True)
-            self.push_imgur_image.setDisabled(True)
+                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+            result = processing.imgur_upload(processing.SHOTPATH[0], customArgs)
+            #self.tab1.setDisabled(True)
+            #self.push_imgur_image.setDisabled(True)
             self.push_imgur_link.setDisabled(False)
             self.push_imgur_link.setText(result)
+            self.push_imgur_image.setText("Copied to clipboard")
             self.push_imgur_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
             self.push_imgur_image.setDisabled(True)
             self.tab2.upload_wrapper.setEnabled(False)
         except processing.requests.exceptions.ConnectionError as e:
-            self.push_imgur_link.setDisabled(False)
-            self.push_imgur_link.setText("Connection error: {}".format(e))
+            #self.push_imgur_link.setDisabled(False)
+            self.push_imgur_link.setText(f"Connection error: {e}")
             self.push_imgur_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")
         except processing.NoLinkException as e:
-            self.push_link.setDisabled(False)
+            #self.push_link.setDisabled(False)
             self.push_link.setText("Error: link is empty or invalid")
             self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")   
 
@@ -451,12 +454,12 @@ class EditConfig(QtWidgets.QWidget):
         self.free_space.valueChanged[int].connect(self.changeFreeSpace)
         self.free_space_label = QtWidgets.QLabel("Offset from image:")
         self.shadow_size = QtWidgets.QSpinBox()
-        self.shadow_size.setRange(15, 45)
+        self.shadow_size.setRange(1, 100)
         self.shadow_size.setValue(config.userShadowSize)
         self.shadow_size.valueChanged.connect(self.changeShadowSize)
         self.shadow_size_label = QtWidgets.QLabel("Shadow size:")
         self.iterations = QtWidgets.QSpinBox()
-        self.iterations.setRange(15, 150)
+        self.iterations.setRange(1, 100)
         self.iterations.setValue(config.userIterations)
         self.iterations.valueChanged.connect(self.changeIterations)
         self.iterations_label = QtWidgets.QLabel("Shadow blur:")
@@ -549,14 +552,15 @@ class EditConfig(QtWidgets.QWidget):
 class ReadConfig(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        if path.isfile("./config"):
-            with open("config", "r") as file:
+        self.script_path = path.dirname(path.realpath(__file__))
+        if path.isfile(f"{self.script_path}/config"):
+            with open(f"{self.script_path}/config", "r") as file:
                 self.data = file.read()
                 self.parse = json.loads(self.data)
                 self.initValues()
         else:
-            with open("config", "w") as file:
-                self.parse = {"config": {"shadows": {"space": 84, "shadow_space": 20, "iterations": 46}, 
+            with open(f"{self.script_path}/config", "w") as file:
+                self.parse = {"config": {"shadows": {"space": 130, "shadow_space": 10, "iterations": 12}, 
                 "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, 
                 "link": "None"},
                 "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image"}}}
@@ -579,7 +583,7 @@ class ReadConfig(QtWidgets.QWidget):
 
     def changeConfig(self, section, undersection, value):
         self.parse["config"][section][undersection] = value
-        with open("config", "w") as file:
+        with open(f"{self.script_path}/config", "w") as file:
             towrite = str(json.dumps(self.parse))
             file.write(towrite)
         self.initValues()
@@ -598,29 +602,29 @@ if __name__ == '__main__':
             except OSError:
                 remove(pidfile)
             else:
-                print("Another instance is running: {}".format(pid))
+                print(f"Another instance is running: {pid}")
                 with open(pidfile_exit, 'w') as file:
                     pass
                 sys.exit(0)
         with open(pidfile, 'w') as file:
             file.write(pid)
     except PermissionError as e:
-        print("Error writing to '{}':".format(pidfile), e)
+        print(f"Error writing to '{pidfile}': {e}")
         sys.exit(1)
     try:
         ap = ArgumentParser()
         ap.add_argument("-s", "--screenshot", required=False, action='store_true',
-        help="take a full screen shot")
+        help="Take fullscreen shot.")
         ap.add_argument("-d", "--directory", required=False,
-        help="Directory to save a screenshot. If not provided, clipboard only is used.")
+        help="Directory to save a screenshot. If not provided, only clipboard is used.")
         args = vars(ap.parse_args())
         if args["directory"]:
-            SHOTPATH[1] = "{}/{}".format(args["directory"], SHOTNAME)
+            processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}"
         if args["screenshot"] == True and not args["directory"]:
-            processing.scrot(SHOTPATH[0])
-            subprocess.call(["xclip", "-sel", "clip", "-t", "image/png", SHOTPATH[0]])
+            processing.scrot(processing.SHOTPATH[0])
+            processing.call(["xclip", "-sel", "clip", "-t", "image/png", processing.SHOTPATH[0]])
         elif args["screenshot"] == True and args["directory"]:
-            processing.scrot(SHOTPATH[1])
+            processing.scrot(processing.SHOTPATH[1])
         else:
             app = QtWidgets.QApplication(sys.argv)
             config = ReadConfig()

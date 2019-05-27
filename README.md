@@ -36,6 +36,8 @@ Manually:
   + `python3 -m pip install aggdraw` 
 - Requests
   + `python3 -m pip install requests`  
+- Notify2
+  + `python3 -m pip install notify2`
   
 ## Usage
 
@@ -70,6 +72,7 @@ Manually:
 | <kbd>S</kbd>                                                              | Open save / upload dialog        |
 | <kbd>Esc</kbd>                                                            | Exit                             |
 | <kbd>Enter</kbd> | Copy selected rectangle to clipboard. If there is no selection, fullscreen will be copied |
+| <kbd>U</kbd>                           | Upload selection to imgur and copy link to clipboard, same as Enter |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd>                                            | Undo                             |
 | <kbd>Mouse wheel</kbd>                                                    | Increase/decrease tool thickness |
 

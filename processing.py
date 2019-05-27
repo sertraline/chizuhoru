@@ -163,7 +163,7 @@ def drawline(begin, end, thickness, actions, pen):
     used.flush()
     TEMP = img
 
-def drawshadow(image, space=130, shadow_space=10, iterations=12):
+def drawshadow(image, space=140, shadow_space=8, iterations=14):
     #https://code.activestate.com/recipes/474116-drop-shadows-with-pil/ this helped me much
     free_space = space - shadow_space
     side_space = free_space//2
@@ -226,7 +226,7 @@ def custom_upload(shotpath, SHOTNAME, customArgs):
         return response.text
 
 def imgur_upload(shotpath, customArgs):
-    imgur_id, imgur_link = customArgs
+    imgur_id, imgur_link, clipboard, called = customArgs
     if not imgur_link:
         raise NoLinkException
     headers = {
@@ -237,5 +237,6 @@ def imgur_upload(shotpath, customArgs):
     }
     response = requests.post(imgur_link, headers=headers, files=files)
     jtext = json.loads(response.text)
-    call(f"echo {jtext['data']['link']} | xclip -sel clip", shell=True)
+    if clipboard or called:
+        call(f"echo {jtext['data']['link']} | xclip -sel clip", shell=True)
     return jtext["data"]["link"]

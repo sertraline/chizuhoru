@@ -10,6 +10,7 @@ from PyQt5.QtCore import QSize, Qt
 from PIL.ImageQt import ImageQt
 
 import json
+import notify2
 import overlay
 import processing
 
@@ -132,10 +133,12 @@ class ScreenWindow(overlay.BaseLayer):
         if qKeyEvent.key() == QtCore.Qt.Key_Return:
             if abs(self.rectw) <= 1 and abs(self.recth) <= 1:
                 processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH)
-                self.closeScreen()
             else:
                 processing.convert(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH)
-                self.closeScreen()
+            notify2.init('Chizuhoru')
+            n = notify2.Notification('Cheese!', "Image was copied to the clipboard.")
+            self.closeScreen()
+            n.show()
         if qKeyEvent.key() == QtCore.Qt.Key_Escape:
             self.closeScreen()
         if qKeyEvent.nativeScanCode() == 28: #"T" key
@@ -151,6 +154,16 @@ class ScreenWindow(overlay.BaseLayer):
             self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
             self.hideScreen()
             self.table_widget.show()
+        if qKeyEvent.nativeScanCode() == 30: #"U" key
+            self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
+            get_imgur = self.table_widget.pushImgurUpload(is_out=True)
+            self.close()
+            notify2.init('Chizuhoru')
+            if get_imgur != None:
+                n = notify2.Notification('Error', get_imgur)
+            else:
+                n = notify2.Notification('Cheese!', "Link was copied to the clipboard.")
+            n.show()
         self.update()
 
 class InitListener(QtCore.QThread):
@@ -254,6 +267,7 @@ class SaveDialog(QtWidgets.QWidget):
         self.checkbox0 = QtWidgets.QCheckBox()
         self.checkbox0.setChecked(True)
         self.checkbox1 = QtWidgets.QCheckBox()
+        self.checkbox1.setChecked(config.shadowDraw)
         self.checktext1 = QtWidgets.QLabel("Draw shadows:")
         self.tab1.main_0_layout.addWidget(self.textbox, 1, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.save, 1, 1, 1, 1)
@@ -312,6 +326,7 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_1_hlayout)
         self.tab2.upload_imgur_wrapper.setLayout(self.tab2.upload_imgur_hlayouts_wrapper)
         self.checkbox_tab2 = QtWidgets.QCheckBox()
+        self.checkbox_tab2.setChecked(config.shadowDraw)
         self.checktext_tab2 = QtWidgets.QLabel("Draw shadows:")
         self.tab2.shadowHLayout = QtWidgets.QHBoxLayout()
         self.tab2.shadowHLayout.addWidget(self.checktext_tab2)
@@ -333,15 +348,16 @@ class SaveDialog(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def askFilename(self):
         self.fname = self.fname if isinstance(self.fname, str) else self.fname[0]
-        self.fname = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
+        self.new_path = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
         self.textbox.setStyleSheet("")
-        path = self.fname[0] if '.png' in self.fname[0].lower() else self.fname[0]+'.png'
+        self.fname = self.new_path[0] if self.new_path[0] else self.fname
+        path = self.fname if '.png' in self.fname.lower() else self.fname+'.png'
         self.textbox.setText(path)
 
 
     def jobIsDone(self):
-        self.clip = 1 if self.checkbox0.isChecked() else 0
-        self.shadow = 1 if self.checkbox1.isChecked() else 0
+        self.clip = int(self.checkbox0.isChecked())
+        self.shadow = int(self.checkbox1.isChecked())
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
         filename = self.fname if isinstance(self.fname, str) else self.fname[0]
         filename = filename if '.png' in filename.lower() else filename+'.png'
@@ -371,7 +387,7 @@ class SaveDialog(QtWidgets.QWidget):
         processing.SHOTNAME = self.push_filename.text()
 
     def pushUpload(self):
-        self.shadow = 1 if self.checkbox_tab2.isChecked() else 0
+        self.shadow = int(self.checkbox_tab2.isChecked())
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
         customArgs = [config.userCustomAccessToken, config.userCustomUsername, config.userCustomPassword, config.userCustomName,
         config.userCustomLink]
@@ -395,40 +411,43 @@ class SaveDialog(QtWidgets.QWidget):
             self.push_link.setText("Error: link is empty or invalid")
             self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")          
 
-    def pushImgurUpload(self):
-        self.shadow = 1 if self.checkbox_tab2.isChecked() else 0
+    def pushImgurUpload(self, is_out=False):
+        self.shadow = int(self.checkbox_tab2.isChecked())
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
-        customArgs = [config.userImgurID, config.userImgurLink]
+        customArgs = [config.userImgurID, config.userImgurLink, config.imgurClipboard, is_out]
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
                 processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             else:
                 processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             result = processing.imgur_upload(processing.SHOTPATH[0], customArgs)
-            #self.tab1.setDisabled(True)
-            #self.push_imgur_image.setDisabled(True)
             self.push_imgur_link.setDisabled(False)
             self.push_imgur_link.setText(result)
-            self.push_imgur_image.setText("Copied to clipboard")
+            if config.imgurClipboard:
+                self.push_imgur_image.setText("Copied to clipboard")
             self.push_imgur_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
             self.push_imgur_image.setDisabled(True)
-            self.tab2.upload_wrapper.setEnabled(False)
+            if not is_out and config.imgurClose:
+                self.close()
+            return None
         except processing.requests.exceptions.ConnectionError as e:
-            #self.push_imgur_link.setDisabled(False)
-            self.push_imgur_link.setText(f"Connection error: {e}")
+            error_text = f"Connection error: {e}"
+            self.push_imgur_link.setText(error_text)
             self.push_imgur_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+            return error_text
         except processing.NoLinkException as e:
-            #self.push_link.setDisabled(False)
-            self.push_link.setText("Error: link is empty or invalid")
-            self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")   
+            error_text = "Error: link is empty or invalid"
+            self.push_link.setText(error_text)
+            self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+            return error_text
 
 class EditConfig(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
         self.height, self.width = __screen.height(), __screen.width()
-        self.setGeometry((self.width / 2 - 200), (self.height / 2 - 180), 400, 360)
-        self.setFixedSize(400, 360)
+        self.setGeometry((self.width / 2 - 200), (self.height / 2 - 180), 400, 420)
+        self.setFixedSize(400, 420)
         self.setWindowTitle("Configuration")
         self.initLayout()
         self.show()
@@ -437,8 +456,12 @@ class EditConfig(QtWidgets.QWidget):
         self.layout = QtWidgets.QVBoxLayout(self)
         self.shadows_config = QtWidgets.QGroupBox()
         self.custom_config = QtWidgets.QGroupBox()
+        self.imgur_config = QtWidgets.QGroupBox()
+        self.imgur_config.setTitle("Imgur")
         self.shadows_config.setTitle("Shadows")
         self.custom_config.setTitle("Custom upload")
+        self.imgur_config.setStyleSheet(r"""
+                QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         self.shadows_config.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         self.custom_config.setStyleSheet(r"""
@@ -448,6 +471,7 @@ class EditConfig(QtWidgets.QWidget):
         self.shadows_h0 = QtWidgets.QHBoxLayout()
         self.shadows_h1 = QtWidgets.QHBoxLayout()
         self.shadows_h2 = QtWidgets.QHBoxLayout()
+        self.shadows_h3 = QtWidgets.QHBoxLayout()
         self.free_space = QtWidgets.QSpinBox()
         self.free_space.setRange(10, 140)
         self.free_space.setValue(config.userSpace)
@@ -463,15 +487,22 @@ class EditConfig(QtWidgets.QWidget):
         self.iterations.setValue(config.userIterations)
         self.iterations.valueChanged.connect(self.changeIterations)
         self.iterations_label = QtWidgets.QLabel("Shadow blur:")
+        self.draw_shadows_label = QtWidgets.QLabel("Draw shadows by default:")
+        self.draw_shadows = QtWidgets.QCheckBox()
+        self.draw_shadows.setChecked(config.shadowDraw)
+        self.draw_shadows.stateChanged.connect(self.changeShadowDraw)
         self.shadows_h0.addWidget(self.free_space_label)
         self.shadows_h0.addWidget(self.free_space)
         self.shadows_h1.addWidget(self.shadow_size_label)
         self.shadows_h1.addWidget(self.shadow_size)
         self.shadows_h2.addWidget(self.iterations_label)
         self.shadows_h2.addWidget(self.iterations)
+        self.shadows_h3.addWidget(self.draw_shadows_label)
+        self.shadows_h3.addWidget(self.draw_shadows)
         self.shadows_v.addLayout(self.shadows_h0)
         self.shadows_v.addLayout(self.shadows_h1)
         self.shadows_v.addLayout(self.shadows_h2)
+        self.shadows_v.addLayout(self.shadows_h3)
         self.shadows_config.setLayout(self.shadows_v)
         #CUSTOM UPLOAD
         self.custom_v = QtWidgets.QVBoxLayout()
@@ -515,8 +546,32 @@ class EditConfig(QtWidgets.QWidget):
         self.custom_v.addLayout(self.custom_h5)
         self.custom_config.setLayout(self.custom_v)
 
+        # IMGUR
+        self.imgur_v = QtWidgets.QVBoxLayout()
+        self.imgur_h0 = QtWidgets.QHBoxLayout()
+        self.imgur_h1 = QtWidgets.QHBoxLayout()
+        self.imgur_checkbox0 = QtWidgets.QCheckBox()
+        self.imgur_checkbox0.setChecked(config.imgurClipboard)
+        self.imgur_checkbox0.stateChanged.connect(self.changeImgurClipboard)
+
+        self.imgur_checkbox1 = QtWidgets.QCheckBox()
+        self.imgur_checkbox1.setChecked(config.imgurClose)
+        self.imgur_checkbox1.stateChanged.connect(self.changeImgurClose)
+
+        self.imgur_label_checkbox0 = QtWidgets.QLabel("Copy link to clipboard:")
+        self.imgur_label_checkbox1 = QtWidgets.QLabel("Close on successful upload:")
+        self.imgur_h0.addWidget(self.imgur_label_checkbox0)
+        self.imgur_h0.addWidget(self.imgur_checkbox0)
+        
+        self.imgur_h1.addWidget(self.imgur_label_checkbox1)
+        self.imgur_h1.addWidget(self.imgur_checkbox1)
+        self.imgur_v.addLayout(self.imgur_h0)
+        self.imgur_v.addLayout(self.imgur_h1)
+        self.imgur_config.setLayout(self.imgur_v)
+
         self.layout.addWidget(self.shadows_config)
         self.layout.addWidget(self.custom_config)
+        self.layout.addWidget(self.imgur_config)
         self.setLayout(self.layout)
 
     @QtCore.pyqtSlot()
@@ -528,6 +583,9 @@ class EditConfig(QtWidgets.QWidget):
 
     def changeIterations(self):
         config.changeConfig("shadows", "iterations", self.iterations.value())
+    
+    def changeShadowDraw(self):
+        config.changeConfig("shadows", "draw_default", int(self.draw_shadows.isChecked()))
     
     def changeAPIKey(self):
         config.changeConfig("custom", "access_token", self.custom_access_token.text())
@@ -548,6 +606,18 @@ class EditConfig(QtWidgets.QWidget):
     def changeCustomLink(self):
         config.changeConfig("custom", "link", self.custom_link.text())
 
+    def changeImgurClipboard(self):
+        if self.imgur_checkbox0.isChecked():
+            self.imgur_checkbox1.setEnabled(True)
+        else:
+            self.imgur_checkbox1.setEnabled(False)
+            config.changeConfig("imgur", "close_on_upload", 0)
+            self.imgur_checkbox1.setChecked(False)
+        config.changeConfig("imgur", "clipboard", int(self.imgur_checkbox0.isChecked()))
+
+    def changeImgurClose(self):
+        config.changeConfig("imgur", "close_on_upload", int(self.imgur_checkbox1.isChecked()))
+
 
 class ReadConfig(QtWidgets.QWidget):
     def __init__(self):
@@ -560,10 +630,12 @@ class ReadConfig(QtWidgets.QWidget):
                 self.initValues()
         else:
             with open(f"{self.script_path}/config", "w") as file:
-                self.parse = {"config": {"shadows": {"space": 130, "shadow_space": 10, "iterations": 12}, 
+                self.parse = {"config": 
+                {"shadows": {"space": 140, "shadow_space": 8, "iterations": 14, "draw_default": 0}, 
                 "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, 
                 "link": "None"},
-                "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image"}}}
+                "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image", 
+                          "clipboard": 1, "close_on_upload": 0}}}
                 file.write(str(json.dumps(self.parse)))
                 self.initValues()
 
@@ -571,6 +643,7 @@ class ReadConfig(QtWidgets.QWidget):
         self.userSpace = self.parse["config"]["shadows"]["space"]
         self.userShadowSize = self.parse["config"]["shadows"]["shadow_space"]
         self.userIterations = self.parse["config"]["shadows"]["iterations"]
+        self.shadowDraw = bool(self.parse["config"]["shadows"]["draw_default"])
 
         self.userCustomAccessToken = self.parse["config"]["custom"]["access_token"]
         self.userCustomUsername = self.parse["config"]["custom"]["username"]
@@ -580,6 +653,8 @@ class ReadConfig(QtWidgets.QWidget):
 
         self.userImgurID = self.parse["config"]["imgur"]["client_id"]
         self.userImgurLink = self.parse["config"]["imgur"]["link"]
+        self.imgurClose = bool(self.parse["config"]["imgur"]["close_on_upload"])
+        self.imgurClipboard = bool(self.parse["config"]["imgur"]["clipboard"])
 
     def changeConfig(self, section, undersection, value):
         self.parse["config"][section][undersection] = value

@@ -21,7 +21,7 @@ class ScreenWindow(overlay.BaseLayer):
         processing.SHOTNAME = fr"{processing.datetime.now().strftime('%d-%b-%Y_%H-%M-%S')}.png"
         processing.SHOTPATH[0] = f"/tmp/{processing.SHOTNAME}"
         if args["directory"] != None:
-            processing.SHOTPATH[1] = f"{args['directory']}/{SHOTNAME}"
+            processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}"
         else:
             processing.SHOTPATH[1] = None
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)

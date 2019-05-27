@@ -15,16 +15,19 @@
 
 ### Packages
 
-- Python **3.7**
-- XClip (read [Clipboard persistence](https://wiki.ubuntu.com/ClipboardPersistence) )
+- Python **3.7+**
+- XClip (read [Clipboard persistence](https://wiki.ubuntu.com/ClipboardPersistence))
   + `apt install xclip` for Ubuntu/Debian
   + `pacman -S xclip` for Arch Linux
 - PyQt5
   + `apt install python3-pyqt5 pyqt5-dev-tools` for Ubuntu/Debian
   + `pacman -S pyqt5-common python-pyqt5` for Arch Linux
+  + as for 2019, `python3 -m pip install PyQt5` also works fine.
 
 ### Modules
+`python3 -m pip install -r requirements.txt`  
 
+Manually:  
 - Python Image Library
   + `python3 -m pip install Pillow`
 - [Python MSS](https://github.com/BoboTiG/python-mss)
@@ -34,10 +37,6 @@
 - Requests
   + `python3 -m pip install requests`  
   
-You can also easily install these modules by running `python3 -m pip install -r requirements.txt`.
-
-Also it needs a composer to support transparency effects. If you are running DE, you will have one already. I'm running only WM, so I use compton.
-
 ## Usage
 
 - Run in GUI:
@@ -56,24 +55,13 @@ Also it needs a composer to support transparency effects. If you are running DE,
     ```shell
     python3 main.py -s -d /home/user/Pictures
     ```  
-- Launch from tray with hotkey: just re-run main.py script. More convenient way would be to make a shell script, i.e Chizuhoru.sh, with these lines inside:
+- Launch from tray with hotkey: just re-run main.py script. A more convenient way would be to make a shell script, i.e Chizuhoru.sh, with these lines inside:
     ```shell
     #!/bin/sh
-    nohup python3 main.py
+    python3 main.py &
+    exit 0
     ```  
-`Nohup` grants you that application will keep up running after closing your terminal emulator session. Then, you need to configure your DE to set your hotkey to launch this script. I use Openbox, so I need to put following contents inside my rc.xml:  
-
-   ```shell
-    $ nano ~/.config/openbox/rc.xml  
-    <keybind key="Print">  
-      <action name="Execute">  
-        <command>/usr/bin/Chizuhoru.sh</command>  
-      </action>  
-    </keybind>  
-   ```  
-
-Now I can call Chizuhoru with PrintScreen hotkey.  
-
+  
 ## Hotkeys
 
 |  Keys                                                                     |  Description                     |
@@ -87,21 +75,22 @@ Now I can call Chizuhoru with PrintScreen hotkey.
 
 ## Compiling
 
-Compiling python script saves some time at its first launch. You can do that by making:  
+Compiling python script saves some time at the first launch. You can do that by making:  
   ```shell
   python3 -m py_compile main.py overlay.py processing.py  
   ```  
   
-Now you can check your `__pycache__` directory for the .pyc files.
+Now you can check your `__pycache__` directory for .pyc files.
 
-## Working with
+## Environments
 
 Environments checked:  
 
-- i3 WM
-- Openbox WM
+- i3 WM + Compton
+- Openbox WM + Compton
 - XFCE
 - Deepin DE
+- KDE
 
 ## TODO
 

@@ -701,6 +701,8 @@ if __name__ == '__main__':
         if args["screenshot"] == True and not args["directory"]:
             processing.scrot(processing.SHOTPATH[0])
             processing.call(["xclip", "-sel", "clip", "-t", "image/png", processing.SHOTPATH[0]])
+            sleep(0.1)
+            remove(processing.SHOTPATH[0])
         elif args["screenshot"] == True and args["directory"]:
             processing.scrot(processing.SHOTPATH[1])
         else:

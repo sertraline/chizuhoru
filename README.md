@@ -49,7 +49,7 @@ Manually:
     ```shell
     python3 main.py -s
     ```  
-- Set default directory:
+- Set default directory instead of `/home/user/`. If present, <kbd>Enter</kbd> and <kbd>U</kbd> hotkeys will copy/upload image AND save it to the directory provided.
     ```shell
     python3 main.py -d /home/user/Pictures
     ```  

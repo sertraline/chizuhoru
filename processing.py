@@ -178,11 +178,13 @@ def drawshadow(image, space=140, shadow_space=8, iterations=14):
     back.paste(image, ((side_space+shadow_space//2), side_space))
     return back
 
-def custom_upload(shotpath, SHOTNAME, customArgs):
+def custom_upload(customArgs):
+    global SHOTPATH, SHOTNAME
     access_token, username, password, bool_name, link = customArgs
     headers = None
     auth = None
     response = ""
+    shotpath = SHOTPATH[1] if SHOTPATH[1] else SHOTPATH[0]
     name = SHOTNAME
     if link == "None" or not link:
         raise NoLinkException
@@ -225,10 +227,12 @@ def custom_upload(shotpath, SHOTNAME, customArgs):
     else:
         return response.text
 
-def imgur_upload(shotpath, customArgs):
+def imgur_upload(customArgs):
+    global SHOTPATH
     imgur_id, imgur_link, clipboard, called = customArgs
     if not imgur_link:
         raise NoLinkException
+    shotpath = SHOTPATH[1] if SHOTPATH[1] else SHOTPATH[0]
     headers = {
         'Authorization': 'Client-ID {}'.format(imgur_id),
     }

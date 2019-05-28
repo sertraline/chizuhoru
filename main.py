@@ -399,7 +399,7 @@ class SaveDialog(QtWidgets.QWidget):
                 processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             else:
                 processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
-            result = processing.custom_upload(processing.SHOTPATH[0], processing.SHOTNAME, customArgs)
+            result = processing.custom_upload(customArgs)
             #self.tab1.setDisabled(True)
             #self.push_image.setDisabled(True)
             self.push_link.setDisabled(False)
@@ -423,7 +423,7 @@ class SaveDialog(QtWidgets.QWidget):
                 processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             else:
                 processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
-            result = processing.imgur_upload(processing.SHOTPATH[0], customArgs)
+            result = processing.imgur_upload(customArgs)
             self.push_imgur_link.setDisabled(False)
             self.push_imgur_link.setText(result)
             if config.imgurClipboard:

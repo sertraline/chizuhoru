@@ -362,7 +362,10 @@ class SaveDialog(QtWidgets.QWidget):
         filename = self.fname if isinstance(self.fname, str) else self.fname[0]
         filename = filename if '.png' in filename.lower() else filename+'.png'
         if not '/' in filename:
-            filename = f"/home/{environ['USER']}/" + filename
+            if processing.SHOTPATH[1]:
+                filename = processing.SHOTPATH[1].replace(processing.SHOTNAME, filename)
+            else:
+                filename = f"/home/{environ['USER']}/"+filename
         if '~/' in filename:
             filename = filename.replace('~/', f"/home/{environ['USER']}/")
         processing.SHOTPATH[1] = filename

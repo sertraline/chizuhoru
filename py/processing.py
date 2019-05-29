@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import mss, mss.tools
 import aggdraw
-from subprocess import call, PIPE, Popen
+from subprocess import call
 from copy import copy
 from os import path, remove
 from datetime import datetime

@@ -211,11 +211,14 @@ class Tray(QtWidgets.QWidget):
         self.listener = InitListener(parent=self)
         self.listener.start()
         show_action = QtWidgets.QAction("Show", self)
+        config_action = QtWidgets.QAction("Configure", self)
         quit_action = QtWidgets.QAction("Exit", self)
+        config_action.triggered.connect(self.initConfig)
         show_action.triggered.connect(self.initScreenCheck)
         quit_action.triggered.connect(self.close)
         tray_menu = QtWidgets.QMenu()
         tray_menu.addAction(show_action)
+        tray_menu.addAction(config_action)
         tray_menu.addAction(quit_action)
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
@@ -231,6 +234,8 @@ class Tray(QtWidgets.QWidget):
             print("Dialog already exists")
         else:
             self.initScreen()
+    def initConfig(self):
+        self.config = EditConfig()
 
 class SaveDialog(QtWidgets.QWidget):
     def __init__(self):
@@ -460,8 +465,8 @@ class EditConfig(QtWidgets.QWidget):
         super().__init__()
         __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
         self.height, self.width = __screen.height(), __screen.width()
-        self.setGeometry((self.width / 2 - 200), (self.height / 2 - 180), 400, 420)
-        self.setFixedSize(400, 420)
+        self.setGeometry((self.width / 2 - 200), (self.height / 2 - 180), 400, 440)
+        self.setFixedSize(400, 440)
         self.setWindowTitle("Configuration")
         self.initLayout()
         self.show()
@@ -688,50 +693,50 @@ class ReadConfig(QtWidgets.QWidget):
         self.initValues()
          
 if __name__ == '__main__':
-    pid = str(getpid())
-    pidfile = "/tmp/chizuhoru.pid"
-    pidfile_exit = pidfile + ".exit"
-    if path.isfile(pidfile_exit):
-        sys.exit(0)
-    try:
-        if path.isfile(pidfile):
-            try:
-                with open(pidfile, 'r') as testcheck:
-                    kill(int(testcheck.read()), 0)
-            except OSError:
-                remove(pidfile)
-            else:
-                print(f"Another instance is running: {pid}")
-                with open(pidfile_exit, 'w') as file:
-                    pass
-                sys.exit(0)
-        with open(pidfile, 'w') as file:
-            file.write(pid)
-    except PermissionError as e:
-        print(f"Error writing to '{pidfile}': {e}")
-        sys.exit(1)
-    try:
-        ap = ArgumentParser()
-        ap.add_argument("-s", "--screenshot", required=False, action='store_true',
-        help="Take fullscreen shot.")
-        ap.add_argument("-d", "--directory", required=False,
-        help="Directory to save a screenshot. If not provided, only clipboard is used.")
-        args = vars(ap.parse_args())
-        if args["directory"]:
-            processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}"
-        if args["screenshot"] == True and not args["directory"]:
-            processing.scrot(processing.SHOTPATH[0])
-            processing.call(["xclip", "-sel", "clip", "-t", "image/png", processing.SHOTPATH[0]])
-            sleep(0.1)
-            remove(processing.SHOTPATH[0])
-        elif args["screenshot"] == True and args["directory"]:
-            processing.scrot(processing.SHOTPATH[1])
-        else:
+    ap = ArgumentParser()
+    ap.add_argument("-s", "--screenshot", required=False, action='store_true',
+    help="Take fullscreen shot.")
+    ap.add_argument("-d", "--directory", required=False,
+    help="Directory to save a screenshot. If not provided, only clipboard is used.")
+    args = vars(ap.parse_args())
+    if args["directory"]:
+        processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}"
+    if args["screenshot"] == True and not args["directory"]:
+        processing.scrot(processing.SHOTPATH[0])
+        processing.call(["xclip", "-sel", "clip", "-t", "image/png", processing.SHOTPATH[0]])
+        sleep(0.1)
+        remove(processing.SHOTPATH[0])
+    elif args["screenshot"] == True and args["directory"]:
+        processing.scrot(processing.SHOTPATH[1])
+    else:
+        pid = str(getpid())
+        pidfile = "/tmp/chizuhoru.pid"
+        pidfile_exit = pidfile + ".exit"
+        if path.isfile(pidfile_exit):
+            sys.exit(0)
+        try:
+            if path.isfile(pidfile):
+                try:
+                    with open(pidfile, 'r') as testcheck:
+                        kill(int(testcheck.read()), 0)
+                except OSError:
+                    remove(pidfile)
+                else:
+                    print(f"Another instance is running: {pid}")
+                    with open(pidfile_exit, 'w') as file:
+                        pass
+                    sys.exit(0)
+            with open(pidfile, 'w') as file:
+                file.write(pid)
+        except PermissionError as e:
+            print(f"Error writing to '{pidfile}': {e}")
+            sys.exit(1)
+        try:
             app = QtWidgets.QApplication(sys.argv)
             config = ReadConfig()
             stayInTray = Tray()
             stayInTray.show()
             app.aboutToQuit.connect(app.deleteLater)
             sys.exit(app.exec_())
-    finally:
-        unlink(pidfile)
+        finally:
+            unlink(pidfile)

@@ -1,0 +1,1 @@
+{"config": {"shadows": {"space": 150, "shadow_space": 4, "iterations": 26, "draw_default": 0, "round_corners": 0}, "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, "link": "None"}, "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image", "clipboard": 1, "close_on_upload": 0}}}

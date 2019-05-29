@@ -61,6 +61,7 @@ class ScreenWindow(overlay.BaseLayer):
                 qp.drawRect(rect)
         else:
             qp.drawRect(self.cords)
+            self.cords = None
     
     def redrawImage(self):
         self.background()
@@ -132,10 +133,12 @@ class ScreenWindow(overlay.BaseLayer):
             if not shouldi:
                 self.redrawImage()
         if qKeyEvent.key() == QtCore.Qt.Key_Return:
+            shadow = int(self.table_widget.checkbox_tab2.isChecked())
+            shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
             if abs(self.rectw) <= 1 and abs(self.recth) <= 1:
-                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH)
+                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=shadow, shadowargs=shadowargs)
             else:
-                processing.convert(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH)
+                processing.convert(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH, shadow=shadow, shadowargs=shadowargs)
             notify2.init('Chizuhoru')
             n = notify2.Notification('Cheese!', "Image was copied to the clipboard.")
             self.closeScreen()
@@ -366,7 +369,7 @@ class SaveDialog(QtWidgets.QWidget):
     def jobIsDone(self):
         self.clip = int(self.checkbox0.isChecked())
         self.shadow = int(self.checkbox1.isChecked())
-        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
+        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
         filename = self.fname if isinstance(self.fname, str) else self.fname[0]
         filename = filename if '.png' in filename.lower() else filename+'.png'
         if not '/' in filename:
@@ -399,7 +402,7 @@ class SaveDialog(QtWidgets.QWidget):
 
     def pushUpload(self):
         self.shadow = int(self.checkbox_tab2.isChecked())
-        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
+        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
         customArgs = [config.userCustomAccessToken, config.userCustomUsername, config.userCustomPassword, config.userCustomName,
         config.userCustomLink]
         try:
@@ -424,7 +427,7 @@ class SaveDialog(QtWidgets.QWidget):
 
     def pushImgurUpload(self, is_out=False):
         self.shadow = int(self.checkbox_tab2.isChecked())
-        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations]
+        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
         customArgs = [config.userImgurID, config.userImgurLink, config.imgurClipboard, is_out]
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
@@ -502,6 +505,10 @@ class EditConfig(QtWidgets.QWidget):
         self.draw_shadows = QtWidgets.QCheckBox()
         self.draw_shadows.setChecked(config.shadowDraw)
         self.draw_shadows.stateChanged.connect(self.changeShadowDraw)
+        self.round_corners_label = QtWidgets.QLabel("Round image corners:")
+        self.round_corners = QtWidgets.QCheckBox()
+        self.round_corners.setChecked(config.roundCorners)
+        self.round_corners.stateChanged.connect(self.changeRoundCorners)
         self.shadows_h0.addWidget(self.free_space_label)
         self.shadows_h0.addWidget(self.free_space)
         self.shadows_h1.addWidget(self.shadow_size_label)
@@ -510,6 +517,8 @@ class EditConfig(QtWidgets.QWidget):
         self.shadows_h2.addWidget(self.iterations)
         self.shadows_h3.addWidget(self.draw_shadows_label)
         self.shadows_h3.addWidget(self.draw_shadows)
+        self.shadows_h3.addWidget(self.round_corners_label)
+        self.shadows_h3.addWidget(self.round_corners)
         self.shadows_v.addLayout(self.shadows_h0)
         self.shadows_v.addLayout(self.shadows_h1)
         self.shadows_v.addLayout(self.shadows_h2)
@@ -597,6 +606,9 @@ class EditConfig(QtWidgets.QWidget):
     
     def changeShadowDraw(self):
         config.changeConfig("shadows", "draw_default", int(self.draw_shadows.isChecked()))
+
+    def changeRoundCorners(self):
+        config.changeConfig("shadows", "round_corners", int(self.round_corners.isChecked()))
     
     def changeAPIKey(self):
         config.changeConfig("custom", "access_token", self.custom_access_token.text())
@@ -642,7 +654,7 @@ class ReadConfig(QtWidgets.QWidget):
         else:
             with open(f"{self.script_path}/config", "w") as file:
                 self.parse = {"config": 
-                {"shadows": {"space": 150, "shadow_space": 6, "iterations": 20, "draw_default": 0}, 
+                {"shadows": {"space": 150, "shadow_space": 4, "iterations": 26, "draw_default": 0, "round_corners": 0}, 
                 "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, 
                 "link": "None"},
                 "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image", 
@@ -655,6 +667,7 @@ class ReadConfig(QtWidgets.QWidget):
         self.userShadowSize = self.parse["config"]["shadows"]["shadow_space"]
         self.userIterations = self.parse["config"]["shadows"]["iterations"]
         self.shadowDraw = bool(self.parse["config"]["shadows"]["draw_default"])
+        self.roundCorners = bool(self.parse["config"]["shadows"]["round_corners"])
 
         self.userCustomAccessToken = self.parse["config"]["custom"]["access_token"]
         self.userCustomUsername = self.parse["config"]["custom"]["username"]

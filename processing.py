@@ -64,18 +64,15 @@ def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, sha
     no rectangle given, saves the image to the clipboard."""
     global TEMP
     img = TEMP
-    if not "-" in str(rectwidth) and "-" not in str(rectheight):
-        crop = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-    else:
-        if "-" in str(rectwidth):
-            rectx = rectx + rectwidth
-            rectwidth = abs(rectwidth)
-        if "-" in str(rectheight):
-            recty = recty + rectheight
-            rectheight = abs(rectheight)
-        crop = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
+    if "-" in str(rectwidth):
+        rectx = rectx + rectwidth
+        rectwidth = abs(rectwidth)
+    if "-" in str(rectheight):
+        recty = recty + rectheight
+        rectheight = abs(rectheight)
+    crop = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
     if shadow == 1:
-        crop = drawshadow(crop, shadowargs[0], shadowargs[1], shadowargs[2])
+        crop = drawshadow(crop, shadowargs[0], shadowargs[1], shadowargs[2], shadowargs[3])
     if SHOTPATH[1] != None:
         crop.save(SHOTPATH[1])
         if clip == 1:
@@ -99,22 +96,16 @@ def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
     global TEMP
     img = TEMP
     actions.push(copy(img))
-    if not "-" in str(rectwidth) and "-" not in str(rectheight):
-        filt = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        filt = filt.filter(ImageFilter.GaussianBlur(radius=4))
-        img.paste(filt, (rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        TEMP = img
-    else:
-        if "-" in str(rectwidth):
-            rectx = rectx + rectwidth
-            rectwidth = abs(rectwidth)
-        if "-" in str(rectheight):
-            recty = recty + rectheight
-            rectheight = abs(rectheight)
-        filt = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        filt = filt.filter(ImageFilter.GaussianBlur(radius=4))
-        img.paste(filt, (rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-        TEMP = img
+    if "-" in str(rectwidth):
+        rectx = rectx + rectwidth
+        rectwidth = abs(rectwidth)
+    if "-" in str(rectheight):
+        recty = recty + rectheight
+        rectheight = abs(rectheight)
+    filt = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
+    filt = filt.filter(ImageFilter.GaussianBlur(radius=4))
+    img.paste(filt, (rectx, recty, (rectwidth + rectx), (rectheight + recty)))
+    TEMP = img
 
 def circle(begin, end, thickness, actions, pen, brush):
     """Draws a circle using aggdraw module"""
@@ -173,19 +164,32 @@ def drawline(begin, end, thickness, actions, pen):
     used.flush()
     TEMP = img
 
-def drawshadow(image, space=150, shadow_space=6, iterations=20):
+def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=False):
     #https://code.activestate.com/recipes/474116-drop-shadows-with-pil/ this helped me much
     free_space = space - shadow_space
     side_space = free_space//2
     background = (0, 0, 0, 0)
-    shadow = "#202020"
+    shadow = "#3c3c3c"
     completeWidth = image.size[0] + space
     completeHeight = image.size[1] + space
     back = Image.new("RGBA", (completeWidth, completeHeight), background)
-    back.paste(shadow, [side_space, side_space, (completeWidth - side_space), (completeHeight - side_space)])
+    back.paste(shadow, [side_space, (side_space+20), (completeWidth - side_space), (completeHeight - side_space)])
     for i in range(0, iterations):
         back = back.filter(ImageFilter.GaussianBlur(6))
-    back.paste(image, ((side_space+shadow_space//2), side_space))
+    if round_corners:
+        radius = 6
+        circle = Image.new('L', (radius * 2, radius * 2), 0)
+        draw = ImageDraw.Draw(circle)
+        draw.ellipse((0, 0, radius * 2, radius * 2), fill=255)
+        alpha = Image.new('L', image.size, 255)
+        alpha.paste(circle.crop((0, 0, radius, radius)), (0, 0))
+        alpha.paste(circle.crop((0, radius, radius, radius * 2)), (0, image.size[1] - radius))
+        alpha.paste(circle.crop((radius, 0, radius * 2, radius)), (image.size[0] - radius, 0))
+        alpha.paste(circle.crop((radius, radius, radius * 2, radius * 2)), (image.size[0] - radius, image.size[1] - radius))
+        image.putalpha(alpha)
+        back.paste(image, ((side_space+shadow_space//2), side_space), mask=image)
+    else:
+        back.paste(image, ((side_space+shadow_space//2), side_space))
     return back
 
 def custom_upload(customArgs):

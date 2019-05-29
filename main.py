@@ -6,9 +6,7 @@ from os import remove, path, getpid, environ, unlink, kill
 from PyQt5.QtGui import QPainter, QImage, QPalette, QBrush
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSize, Qt
-
 from PIL.ImageQt import ImageQt
-
 import json
 import notify2
 import overlay
@@ -33,6 +31,7 @@ class ScreenWindow(overlay.BaseLayer):
         self.colorsDialog = overlay.LePalette()
         self.background()
         self.actions = processing.Stack()
+        self.cords = None  #active window coordinates
 
     def background(self):
         img = ImageQt(processing.TEMP)
@@ -46,19 +45,22 @@ class ScreenWindow(overlay.BaseLayer):
         qp = QtGui.QPainter(self)
         br = QtGui.QBrush(QtGui.QColor(103, 150, 188, 60))
         qp.setBrush(br)
-        rect = QtCore.QRect(self.begin, self.end)
-        self.rectx, self.recty, self.rectw, self.recth = list(rect.getRect())
-        self.detailedcoord = list(rect.getCoords())
-        if self.toolkit.switch == 2:
-            qp.drawEllipse(rect)
-        elif self.toolkit.switch == 4:
-            qp.drawLine(self.begin.x(), self.begin.y(), self.end.x(), self.end.y())
-        elif self.toolkit.switch == 5:
-            br = QtGui.QPen(QtGui.QColor(103, 150, 188, 60), 4)
-            qp.setPen(br)
-            qp.drawPoint(self.end.x(), self.end.y())
+        if not self.cords:
+            rect = QtCore.QRect(self.begin, self.end)
+            self.rectx, self.recty, self.rectw, self.recth = list(rect.getRect())
+            self.detailedcoord = list(rect.getCoords())
+            if self.toolkit.switch == 2:
+                qp.drawEllipse(rect)
+            elif self.toolkit.switch == 4:
+                qp.drawLine(self.begin.x(), self.begin.y(), self.end.x(), self.end.y())
+            elif self.toolkit.switch == 5:
+                br = QtGui.QPen(QtGui.QColor(103, 150, 188, 60), 4)
+                qp.setPen(br)
+                qp.drawPoint(self.end.x(), self.end.y())
+            else:
+                qp.drawRect(rect)
         else:
-            qp.drawRect(rect)
+            qp.drawRect(self.cords)
     
     def redrawImage(self):
         self.background()
@@ -121,7 +123,6 @@ class ScreenWindow(overlay.BaseLayer):
         else:
             if self.toolkit.thickness < 20:
                 self.toolkit.thickness += 1
-        self.toolkit.update_label()
 
     def keyPressEvent(self, qKeyEvent):
         if (qKeyEvent.nativeModifiers() == 4 or qKeyEvent.nativeModifiers() == 8196
@@ -164,6 +165,13 @@ class ScreenWindow(overlay.BaseLayer):
             else:
                 n = notify2.Notification('Cheese!', "Link was copied to the clipboard.")
             n.show()
+        if qKeyEvent.nativeScanCode() == 38: #"A" key
+            self.hideScreen()
+            self.rectw, self.recth, self.rectx, self.recty = processing.grep_window()
+            point_zero = QtCore.QPoint(self.rectx, self.recty)
+            point_one = QtCore.QPoint((self.rectx+self.rectw), (self.recty+self.recth))
+            self.cords = QtCore.QRect(point_zero, point_one)
+            self.show()
         self.update()
 
 class InitListener(QtCore.QThread):
@@ -476,7 +484,7 @@ class EditConfig(QtWidgets.QWidget):
         self.shadows_h2 = QtWidgets.QHBoxLayout()
         self.shadows_h3 = QtWidgets.QHBoxLayout()
         self.free_space = QtWidgets.QSpinBox()
-        self.free_space.setRange(10, 140)
+        self.free_space.setRange(10, 240)
         self.free_space.setValue(config.userSpace)
         self.free_space.valueChanged[int].connect(self.changeFreeSpace)
         self.free_space_label = QtWidgets.QLabel("Offset from image:")
@@ -634,7 +642,7 @@ class ReadConfig(QtWidgets.QWidget):
         else:
             with open(f"{self.script_path}/config", "w") as file:
                 self.parse = {"config": 
-                {"shadows": {"space": 140, "shadow_space": 8, "iterations": 14, "draw_default": 0}, 
+                {"shadows": {"space": 150, "shadow_space": 6, "iterations": 20, "draw_default": 0}, 
                 "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, 
                 "link": "None"},
                 "imgur": {"client_id": "25b4ba1ecc97502", "link": "https://api.imgur.com/3/image", 

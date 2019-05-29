@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import mss, mss.tools
 import aggdraw
-from subprocess import call
+from subprocess import call, PIPE, Popen
 from copy import copy
 from os import path, remove
 from datetime import datetime
@@ -10,6 +10,7 @@ import json
 import re
 import requests
 from io import BytesIO
+from Xlib.display import Display
 
 SHOTNAME = "{}.png".format(datetime.now().strftime("%d-%b-%Y_%H-%M-%S"))
 SHOTPATH = ["/tmp/{}".format(SHOTNAME), None]
@@ -83,6 +84,15 @@ def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, sha
         crop.save(SHOTPATH[0])
         if clip == 1:
             call(["xclip", "-sel", "clip", "-t", "image/png", SHOTPATH[0]])
+
+def grep_window():
+    """Get window coordinates under the mouse pointer"""
+    display = Display()
+    window = display.screen().root
+    result = window.query_pointer()
+    dims = result.child.get_geometry()
+    return (dims.width, dims.height, dims.x, dims.y)
+
 
 def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
     """Blurs a rectangle with given coordinates"""
@@ -163,7 +173,7 @@ def drawline(begin, end, thickness, actions, pen):
     used.flush()
     TEMP = img
 
-def drawshadow(image, space=140, shadow_space=8, iterations=14):
+def drawshadow(image, space=150, shadow_space=6, iterations=20):
     #https://code.activestate.com/recipes/474116-drop-shadows-with-pil/ this helped me much
     free_space = space - shadow_space
     side_space = free_space//2

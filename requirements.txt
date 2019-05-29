@@ -3,3 +3,4 @@ requests==2.20.0
 mss==3.3.0
 Pillow==5.2.0
 notify2==0.3.1
+Xlib==1.12.0

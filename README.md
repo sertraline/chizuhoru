@@ -38,6 +38,8 @@ Manually:
   + `python3 -m pip install requests`  
 - Notify2
   + `python3 -m pip install notify2`
+- Xlib
+  + `python3 -m pip install Xlib`
   
 ## Usage
 
@@ -70,6 +72,7 @@ Manually:
 |---                                                                        |---                               |
 | <kbd>T</kbd>                                                              | Show toolkit                     |
 | <kbd>S</kbd>                                                              | Open save / upload dialog        |
+| <kbd>A</kbd>                                                         | Select window under the mouse pointer |
 | <kbd>Esc</kbd>                                                            | Exit                             |
 | <kbd>Enter</kbd> | Copy selected rectangle to clipboard. If there is no selection, fullscreen will be copied |
 | <kbd>U</kbd>                           | Upload selection to imgur and copy link to clipboard, same as Enter |

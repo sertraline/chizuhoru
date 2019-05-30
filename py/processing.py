@@ -11,7 +11,6 @@ import re
 import requests
 from io import BytesIO
 from Xlib.display import Display
-import sys
 
 SHOTNAME = "{}.png".format(datetime.now().strftime("%d-%b-%Y_%H-%M-%S"))
 SHOTPATH = ["/tmp/{}".format(SHOTNAME), None]
@@ -166,7 +165,6 @@ def drawline(begin, end, thickness, actions, pen):
     TEMP = img
 
 def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=False):
-    #https://code.activestate.com/recipes/474116-drop-shadows-with-pil/ this helped me much
     free_space = space - shadow_space
     side_space = free_space//2
     background = (0, 0, 0, 0)

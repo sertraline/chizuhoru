@@ -165,13 +165,13 @@ class ScreenWindow(overlay.BaseLayer):
             notify2.init('Chizuhoru')
             if get_imgur != None:
                 n = notify2.Notification('Error', get_imgur)
+                print(get_imgur)
             else:
                 n = notify2.Notification('Cheese!', "Link was copied to the clipboard.")
             n.show()
         if qKeyEvent.nativeScanCode() == 38: #"A" key
             self.hideScreen()
             self.rectw, self.recth, self.rectx, self.recty = processing.grep_window()
-            print(self.rectx, self.recty)
             point_zero = QtCore.QPoint(self.rectx, self.recty)
             point_one = QtCore.QPoint((self.rectx+self.rectw), (self.recty+self.recth))
             self.cords = QtCore.QRect(point_zero, point_one)
@@ -436,7 +436,6 @@ class SaveDialog(QtWidgets.QWidget):
             self.push_link.setDisabled(False)
             self.push_link.setText(result)
             self.push_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
-            self.tab2.upload_imgur_wrapper.setEnabled(False)
         except processing.requests.exceptions.ConnectionError as e:
             self.push_link.setText(f"Connection error: {e}")
             self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")

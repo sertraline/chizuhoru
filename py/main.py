@@ -171,6 +171,7 @@ class ScreenWindow(overlay.BaseLayer):
         if qKeyEvent.nativeScanCode() == 38: #"A" key
             self.hideScreen()
             self.rectw, self.recth, self.rectx, self.recty = processing.grep_window()
+            print(self.rectx, self.recty)
             point_zero = QtCore.QPoint(self.rectx, self.recty)
             point_one = QtCore.QPoint((self.rectx+self.rectw), (self.recty+self.recth))
             self.cords = QtCore.QRect(point_zero, point_one)
@@ -242,13 +243,14 @@ class SaveDialog(QtWidgets.QWidget):
         super().__init__()
         __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
         self.height, self.width = __screen.height(), __screen.width()
-        self.setGeometry((self.width / 2 - 200), (self.height / 2), 400, 290)
-        self.setFixedSize(400, 290)
+        self.setGeometry((self.width / 2 - 200), (self.height / 2), 400, 320)
+        self.setFixedSize(400, 320)
         self.setWindowTitle("Save / Upload")
         
         self.args = []
         self.fname = processing.SHOTPATH[1] if (processing.SHOTPATH[1] != None) else (
             f"/home/{environ['USER']}/{processing.SHOTNAME}")
+        self.upload_preset = "custom"
         self.initLayout()
     
     def initLayout(self):
@@ -303,13 +305,21 @@ class SaveDialog(QtWidgets.QWidget):
     def initTabTwo(self):
         self.tab2.vertical_wrapper = QtWidgets.QVBoxLayout()
         self.tab2.upload_wrapper = QtWidgets.QGroupBox()
+        self.tab2.upload_wrapper.setFixedSize(355, 110)
         self.tab2.upload_wrapper.setTitle("Custom")
         self.tab2.upload_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         self.tab2.upload_hlayouts_wrapper = QtWidgets.QVBoxLayout()
+        self.tab2.upload_presets_layout = QtWidgets.QHBoxLayout()
         self.tab2.upload_0_hlayout = QtWidgets.QHBoxLayout()
         self.tab2.upload_1_hlayout = QtWidgets.QHBoxLayout()
         #CUSTOM
+        self.presets_label = QtWidgets.QLabel("Presets:")
+        self.presets = QtWidgets.QComboBox()
+        self.presets.addItems(["custom", "catbox.moe", "uguu.se"])
+        self.presets.currentIndexChanged.connect(self.setPresets)
+        self.tab2.upload_presets_layout.addWidget(self.presets_label)
+        self.tab2.upload_presets_layout.addWidget(self.presets)
         self.filename_title = QtWidgets.QLabel("Filename:")
         self.push_filename = QtWidgets.QLineEdit(self)
         self.push_filename.setText(f"{processing.SHOTNAME}")
@@ -321,11 +331,13 @@ class SaveDialog(QtWidgets.QWidget):
         for i in [self.filename_title, self.push_filename, self.push_image]:
             self.tab2.upload_0_hlayout.addWidget(i)
         self.tab2.upload_1_hlayout.addWidget(self.push_link)
+        self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_presets_layout)
         self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_0_hlayout)
         self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_1_hlayout)
         self.tab2.upload_wrapper.setLayout(self.tab2.upload_hlayouts_wrapper)
         #IMGUR
         self.tab2.upload_imgur_wrapper = QtWidgets.QGroupBox()
+        self.tab2.upload_imgur_wrapper.setFixedSize(355, 80)
         self.tab2.upload_imgur_wrapper.setTitle("Imgur")
         self.tab2.upload_imgur_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
@@ -399,25 +411,28 @@ class SaveDialog(QtWidgets.QWidget):
             self.textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
     def changeTextboxFilename(self):
-        new_name = self.textbox.text()
         self.fname = self.textbox.text()
 
     def changeUploadFilename(self):
         processing.SHOTNAME = self.push_filename.text()
 
+    def setPresets(self):
+        self.upload_preset = self.presets.currentText()
+
     def pushUpload(self):
         self.shadow = int(self.checkbox_tab2.isChecked())
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
-        customArgs = [config.userCustomAccessToken, config.userCustomUsername, config.userCustomPassword, config.userCustomName,
-        config.userCustomLink]
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
                 processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
             else:
                 processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
-            result = processing.custom_upload(customArgs)
-            #self.tab1.setDisabled(True)
-            #self.push_image.setDisabled(True)
+            if self.upload_preset == "custom":
+                customArgs = [config.userCustomAccessToken, config.userCustomUsername, 
+                config.userCustomPassword, config.userCustomName, config.userCustomLink]
+                result = processing.custom_upload(args=customArgs)
+            else:
+                result = processing.custom_upload(preset=self.upload_preset)
             self.push_link.setDisabled(False)
             self.push_link.setText(result)
             self.push_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")

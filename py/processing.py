@@ -11,6 +11,7 @@ import re
 import requests
 from io import BytesIO
 from Xlib.display import Display
+import sys
 
 SHOTNAME = "{}.png".format(datetime.now().strftime("%d-%b-%Y_%H-%M-%S"))
 SHOTPATH = ["/tmp/{}".format(SHOTNAME), None]
@@ -192,40 +193,40 @@ def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=Fa
         back.paste(image, ((side_space+shadow_space//2), side_space))
     return back
 
-def custom_upload(customArgs):
+def custom_upload(args=[], preset="custom"):
     global SHOTPATH, SHOTNAME
-    access_token, username, password, bool_name, link = customArgs
-    headers = None
-    auth = None
-    response = ""
     shotpath = SHOTPATH[1] if SHOTPATH[1] else SHOTPATH[0]
     name = SHOTNAME
-    if link == "None" or not link:
-        raise NoLinkException
-    if "catbox.moe" in link:
+    name = name + ".png" if not ".png" in name.lower() else name
+    if preset == "catbox.moe":
+        link = "https://catbox.moe/user/api.php"
+        im =  open(shotpath, 'rb')
         files = {
-            'fileToUpload': (SHOTNAME, open(shotpath, 'rb'), 'image/png')
+            'fileToUpload': (name, im, 'image/png')
         }
         data = {
             'reqtype': 'fileupload',
             'userhash': ''
         }
         response = requests.post(link, data=data, files=files)
+    elif preset == "uguu.se":
+        link = "https://uguu.se/api.php?d=upload-tool"
+        files = {
+            'name': (None, name),
+            'file': (name, open(shotpath, 'rb'))
+        }
+        response = requests.post(link, files=files)
     else:
+        access_token, username, password, bool_name, link = args
+        headers = None
+        auth = None
+        if link == "None" or not link:
+            raise NoLinkException
         if access_token != "None":
             headers = {'Authorization': access_token}
         if username != "None" and password != "None":
             auth = (username, password)
         if bool_name == True:
-            if not ".png" in name:
-                for c, i in enumerate((".jpg", ".jpeg")):
-                    if name.endswith(i):
-                        name = name.replace(i, ".png")
-                        break
-                    elif c == 1:
-                        name = name + ".png"
-                        print(name)
-                        break
             files = {
                 'name': (None, name),
                 'file': (shotpath, open(shotpath, 'rb')),
@@ -240,14 +241,16 @@ def custom_upload(customArgs):
             response = requests.post(link, auth=auth, files=files)
         else:
             response = requests.post(link, files=files)
-    result = response.text
-    if "<a href=" in result:
-        urls = re.search(r'(https?://|http?://)(?:[-\w.]|(?:%[\da-fA-F]{2}))+', link)
-        reeeeeeee = r'href=[\'"]?([^\'" >]+)'
-        url = re.findall(reeeeeeee, result)
-        for i in url:
-            if urls.group(0) in i:
-                return i
+    if "<a href=" in response.text:
+        try_find_name = re.search(rf'(?:http:\/\/|https:\/\/)([-\w.\/])+([-_\w\d.])*{name}', response.text)
+        if try_find_name is not None:
+            return try_find_name.group(0)
+        url = re.search(r'(?:https?:\/\/|http?:\/\/)(?:[-\w.]|(?:%[\da-fA-F]{2}))+', link)
+        match = url.group(0).replace('https://', '').replace('http://', '')
+        urls = re.findall(r'href=[\'"]?([^\'" >]+)', response.text)
+        for item in urls:
+            if match in item:
+                return item
     else:
         return response.text
 

@@ -202,34 +202,44 @@ def custom_upload(customArgs):
     name = SHOTNAME
     if link == "None" or not link:
         raise NoLinkException
-    if access_token != "None":
-        headers = {'Authorization': access_token}
-    if username != "None" and password != "None":
-        auth = (username, password)
-    if bool_name == True:
-        if not ".png" in name:
-            for c, i in enumerate((".jpg", ".jpeg")):
-                if name.endswith(i):
-                    name = name.replace(i, ".png")
-                    break
-                elif c == 1:
-                    name = name + ".png"
-                    print(name)
-                    break
+    if "catbox.moe" in link:
         files = {
-            'name': (None, name),
-            'file': (shotpath, open(shotpath, 'rb')),
+            'fileToUpload': (SHOTNAME, open(shotpath, 'rb'), 'image/png')
         }
-    else:
-        files = {
-            'file': (shotpath, open(shotpath, 'rb'))
+        data = {
+            'reqtype': 'fileupload',
+            'userhash': ''
         }
-    if headers != None:
-        response = requests.post(link, headers=headers, files=files)
-    elif auth != None:
-        response = requests.post(link, auth=auth, files=files)
+        response = requests.post(link, data=data, files=files)
     else:
-        response = requests.post(link, files=files)
+        if access_token != "None":
+            headers = {'Authorization': access_token}
+        if username != "None" and password != "None":
+            auth = (username, password)
+        if bool_name == True:
+            if not ".png" in name:
+                for c, i in enumerate((".jpg", ".jpeg")):
+                    if name.endswith(i):
+                        name = name.replace(i, ".png")
+                        break
+                    elif c == 1:
+                        name = name + ".png"
+                        print(name)
+                        break
+            files = {
+                'name': (None, name),
+                'file': (shotpath, open(shotpath, 'rb')),
+            }
+        else:
+            files = {
+                'file': (shotpath, open(shotpath, 'rb'))
+            }
+        if headers != None:
+            response = requests.post(link, headers=headers, files=files)
+        elif auth != None:
+            response = requests.post(link, auth=auth, files=files)
+        else:
+            response = requests.post(link, files=files)
     result = response.text
     if "<a href=" in result:
         urls = re.search(r'(https?://|http?://)(?:[-\w.]|(?:%[\da-fA-F]{2}))+', link)

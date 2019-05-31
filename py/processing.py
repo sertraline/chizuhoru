@@ -243,6 +243,9 @@ def custom_upload(args=[], preset="custom"):
         try_find_name = re.search(rf'(?:http:\/\/|https:\/\/)([-\w.\/])+([-_\w\d.])*{name}', response.text)
         if try_find_name is not None:
             return try_find_name.group(0)
+        try_find_png = re.search(r'(?:http:\/\/|https:\/\/)([-\w.\/])+([-_\w\d.])*.png', response.text)
+        if try_find_png is not None:
+            return try_find_png.group(0)
         url = re.search(r'(?:https?:\/\/|http?:\/\/)(?:[-\w.]|(?:%[\da-fA-F]{2}))+', link)
         match = url.group(0).replace('https://', '').replace('http://', '')
         urls = re.findall(r'href=[\'"]?([^\'" >]+)', response.text)

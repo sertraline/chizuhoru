@@ -700,11 +700,11 @@ class ReadConfig(QtWidgets.QWidget):
 if __name__ == '__main__':
     ap = ArgumentParser()
     ap.add_argument("-s", "--screenshot", required=False, action='store_true',
-    help="Take fullscreen shot.")
+    help="Take fullscreen shot, copy to clipboard. Use with -d to save image to the disk.")
     ap.add_argument("-d", "--directory", required=False,
-    help="Directory to save a screenshot. If not provided, only clipboard is used.")
+    help="If used without -s, sets default directory to save a screenshot. This way, Enter and U hotkeys will copy/upload image AND save it to the path provided. If used with -s, saves fullscreen shot to the path provided.")
     ap.add_argument("-m", "--monitor", required=False,
-    help="Select a display to grab. Default: 0")
+    help="Select screen to grab. [-1, 0, 1, 2, n] Default: -1 (all screens)")
     args = vars(ap.parse_args())
     mon = -1 if not args["monitor"] else int(args["monitor"])
     if args["directory"]:

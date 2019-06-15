@@ -42,19 +42,19 @@ class Stack:
 class NoLinkException(Exception):
     pass
 
-def scrot(path=""):
+def scrot(screen=-1, path=""):
     global TEMP
     sct = mss.mss()
+    mon = sct.monitors[screen+1]
+    shot = sct.grab(mon)
+    raw_bytes = mss.tools.to_png(shot.rgb, shot.size)
     if path:
         try:
-            filename = sct.shot(mon=-1, output=path)
+            Image.open(BytesIO(raw_bytes)).save(path)
         except PermissionError as e:
             print(f"Error writting to '{path}': {e}")
             sys.exit(1)
     else:
-        mon = sct.monitors[1]
-        shot = sct.grab(mon)
-        raw_bytes = mss.tools.to_png(shot.rgb, shot.size)
         img = Image.open(BytesIO(raw_bytes))
         TEMP = img
 

@@ -8,23 +8,20 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSize, Qt
 from PIL.ImageQt import ImageQt
 import json
-import notify2
 import overlay
 import processing
 
 class ScreenWindow(overlay.BaseLayer):
     def __init__(self):
         super().__init__()
-        processing.scrot()
+        self.move(self.left, self.top)
+        processing.scrot(self.screen)
         #update screenshot name and path
         processing.SHOTNAME = fr"{processing.datetime.now().strftime('%d-%b-%Y_%H-%M-%S')}.png"
         processing.SHOTPATH[0] = f"/tmp/{processing.SHOTNAME}"
-        if args["directory"] != None:
-            processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}"
-        else:
-            processing.SHOTPATH[1] = None
+        processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}" if args[
+            "directory"] != None else None
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
-
         self.table_widget = SaveDialog()
         self.showFullScreen()
         self.toolkit = overlay.Toolkit()
@@ -139,10 +136,7 @@ class ScreenWindow(overlay.BaseLayer):
                 processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=shadow, shadowargs=shadowargs)
             else:
                 processing.convert(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH, shadow=shadow, shadowargs=shadowargs)
-            notify2.init('Chizuhoru')
-            n = notify2.Notification('Cheese!', "Image was copied to the clipboard.")
             self.closeScreen()
-            n.show()
         if qKeyEvent.key() == QtCore.Qt.Key_Escape:
             self.closeScreen()
         if qKeyEvent.nativeScanCode() == 28: #"T" key
@@ -160,15 +154,8 @@ class ScreenWindow(overlay.BaseLayer):
             self.table_widget.show()
         if qKeyEvent.nativeScanCode() == 30: #"U" key
             self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
-            get_imgur = self.table_widget.pushImgurUpload(is_out=True)
+            self.table_widget.pushImgurUpload(is_out=True)
             self.close()
-            notify2.init('Chizuhoru')
-            if get_imgur != None:
-                n = notify2.Notification('Error', get_imgur)
-                print(get_imgur)
-            else:
-                n = notify2.Notification('Cheese!', "Link was copied to the clipboard.")
-            n.show()
         if qKeyEvent.nativeScanCode() == 38: #"A" key
             self.hideScreen()
             self.rectw, self.recth, self.rectx, self.recty = processing.grep_window()
@@ -241,9 +228,11 @@ class Tray(QtWidgets.QWidget):
 class SaveDialog(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
-        self.height, self.width = __screen.height(), __screen.width()
-        self.setGeometry((self.width / 2 - 200), (self.height / 2), 400, 320)
+        __screen = QtWidgets.QDesktopWidget().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+        __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
+        self.screen = __screen
+        self.height, self.width, self.left, self.top = __screen_geo.height(), __screen_geo.width(), __screen_geo.left(), __screen_geo.top()
+        self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2)), 400, 320)
         self.setFixedSize(400, 320)
         self.setWindowTitle("Save / Upload")
         
@@ -379,7 +368,7 @@ class SaveDialog(QtWidgets.QWidget):
         self.new_path = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
         self.textbox.setStyleSheet("")
         self.fname = self.new_path[0] if self.new_path[0] else self.fname
-        path = self.fname if '.png' in self.fname.lower() else self.fname+'.png'
+        path = self.fname if self.fname.lower().endswith('.png') else self.fname+'.png'
         self.textbox.setText(path)
 
 
@@ -477,9 +466,11 @@ class SaveDialog(QtWidgets.QWidget):
 class EditConfig(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
-        self.height, self.width = __screen.height(), __screen.width()
-        self.setGeometry((self.width / 2 - 200), (self.height / 2 - 180), 400, 440)
+        __screen = QtWidgets.QDesktopWidget().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+        __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
+        self.screen = __screen
+        self.height, self.width, self.left, self.top = __screen_geo.height(), __screen_geo.width(), __screen_geo.left(), __screen_geo.top()
+        self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2 - 180)), 400, 440)
         self.setFixedSize(400, 440)
         self.setWindowTitle("Configuration")
         self.initLayout()
@@ -712,16 +703,19 @@ if __name__ == '__main__':
     help="Take fullscreen shot.")
     ap.add_argument("-d", "--directory", required=False,
     help="Directory to save a screenshot. If not provided, only clipboard is used.")
+    ap.add_argument("-m", "--monitor", required=False,
+    help="Select a display to grab. Default: 0")
     args = vars(ap.parse_args())
+    mon = -1 if not args["monitor"] else int(args["monitor"])
     if args["directory"]:
         processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}"
     if args["screenshot"] == True and not args["directory"]:
-        processing.scrot(processing.SHOTPATH[0])
+        processing.scrot(screen=mon, path=processing.SHOTPATH[0])
         processing.call(["xclip", "-sel", "clip", "-t", "image/png", processing.SHOTPATH[0]])
         sleep(0.1)
         remove(processing.SHOTPATH[0])
     elif args["screenshot"] == True and args["directory"]:
-        processing.scrot(processing.SHOTPATH[1])
+        processing.scrot(screen=mon, path=processing.SHOTPATH[1])
     else:
         pid = str(getpid())
         pidfile = "/tmp/chizuhoru.pid"

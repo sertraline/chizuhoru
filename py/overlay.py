@@ -8,8 +8,10 @@ import processing
 class BaseLayer(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        __screen = QtWidgets.QDesktopWidget().screenGeometry(-1)
-        self.height, self.width = __screen.height(), __screen.width()
+        __screen = QtWidgets.QDesktopWidget().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
+        __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
+        self.screen = __screen
+        self.height, self.width, self.left, self.top = __screen_geo.height(), __screen_geo.width(), __screen_geo.left(), __screen_geo.top()
         self.setGeometry(0,0,self.width,self.height)
         self.rectx, self.recty, self.rectw, self.recth = [0 for i in range(4)]
         self.setCursor(QtGui.QCursor(QtGui.QCursor(QtCore.Qt.CrossCursor)))
@@ -20,7 +22,8 @@ class BaseLayer(QtWidgets.QWidget):
 class LePalette(BaseLayer):     
     def __init__(self):
         super().__init__()
-        self.setGeometry((self.width / 2 - 120), (self.height - 46), 240, 20)
+        self.move(self.left, self.top)
+        self.setGeometry((self.left + (self.width / 2 - 120)), (self.top + (self.height - 46)), 240, 20)
         self.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.pen = "#e81832"
@@ -73,7 +76,7 @@ class Toolkit(BaseLayer):
         super().__init__()
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        self.setGeometry((self.width / 2 - 120), (self.height - 25), 240, 20)
+        self.setGeometry((self.left + (self.width / 2 - 120)), (self.top + (self.height - 25)), 240, 20)
         self.setWindowOpacity(0.85)
         self.switch = 0
         self.thickness = 4

@@ -33,13 +33,13 @@ fi;
 echo "Installing modules..."
 $pyt -m venv env
 source env/bin/activate
-$pyt -m pip install -r requirements.txt
+$pyt -m pip install mss aggdraw requests Pillow PyQt5 Xlib
 deactivate
 SCRIPT_PATH=$(dirname $(realpath -s $0))
 echo "Creating chizuhoru.sh..."
 echo """#!/bin/bash
 source $SCRIPT_PATH/env/bin/activate
-python3 $SCRIPT_PATH/py/main.py \$* &
+$pyt $SCRIPT_PATH/py/main.py \$* &
 deactivate
 exit 0
 """ > chizuhoru

@@ -28,7 +28,7 @@ if $pyt -c "import venv" &> /dev/null; then
     echo "virtualenv found.";
 else
     echo "no virtualenv found: installing...";
-    $pyt -m pip install virtualenv;
+    $pyt -m pip install virtualenv --user;
 fi;
 echo "Installing modules..."
 $pyt -m venv env

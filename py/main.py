@@ -190,6 +190,10 @@ class Tray(QtWidgets.QWidget):
         self.initScreen()
 
     def initScreen(self):
+        try:
+            del self.window
+        except AttributeError:
+            pass
         self.window = ScreenWindow()
         self.window.show()
 

@@ -94,6 +94,9 @@ Encoding                   |  Decoding
 :-------------------------:|:-------------------------:
 ![](https://i.imgur.com/vBbwzf9.png)  |  ![](https://i.imgur.com/CJ2SJ1y.png)
 
+Original image             |  Decoded image
+:-------------------------:|:-------------------------:
+![](https://i.imgur.com/VJxxcSn.png)  |  ![](https://i.imgur.com/RaTWwAS.png)
 
 ## Environments
 

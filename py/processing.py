@@ -1,20 +1,23 @@
 #!/usr/bin/python3
-import mss, mss.tools
-import aggdraw
-from subprocess import call
-from copy import copy
-from os import path, remove
-from datetime import datetime
-from PIL import Image, ImageFilter, ImageDraw
-import json
 import re
+import json
+import aggdraw
 import requests
+import binascii
+import mss, mss.tools
+from copy import copy
 from io import BytesIO
+from os import path, remove
+from subprocess import call
+from datetime import datetime
 from Xlib.display import Display
+from PIL import Image, ImageFilter, ImageDraw
 
-SHOTNAME = "{}.png".format(datetime.now().strftime("%d-%b-%Y_%H-%M-%S"))
+
+SHOTNAME = "{}.png".format(datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 SHOTPATH = ["/tmp/{}".format(SHOTNAME), None]
 TEMP = ''
+
 
 class Stack:
     def __init__(self):
@@ -39,8 +42,10 @@ class Stack:
             TEMP = self.items[(len(self.items) - 1)]
             self.items.pop()
 
+
 class NoLinkException(Exception):
     pass
+
 
 def scrot(screen=-1, path=""):
     global TEMP
@@ -82,6 +87,7 @@ def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, sha
         if clip == 1:
             call(["xclip", "-sel", "clip", "-t", "image/png", SHOTPATH[0]])
 
+
 def grep_window():
     """Get window coordinates under the mouse pointer"""
     display = Display()
@@ -107,6 +113,7 @@ def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
     img.paste(filt, (rectx, recty, (rectwidth + rectx), (rectheight + recty)))
     TEMP = img
 
+
 def circle(begin, end, thickness, actions, pen, brush):
     """Draws a circle using aggdraw module"""
     global TEMP
@@ -130,6 +137,7 @@ def circle(begin, end, thickness, actions, pen, brush):
     used.flush()
     TEMP = img
 
+
 def drawrectangle(begin, end, thickness, actions, pen, brush):
     """Draws a rectangle using aggdraw module"""
     global TEMP
@@ -152,6 +160,7 @@ def drawrectangle(begin, end, thickness, actions, pen, brush):
     used.flush()
     TEMP = img
 
+
 def drawline(begin, end, thickness, actions, pen):
     """Draws a line using aggdraw module"""
     global TEMP
@@ -163,6 +172,7 @@ def drawline(begin, end, thickness, actions, pen):
     used.line((x0, y0, x1, y1), apen)
     used.flush()
     TEMP = img
+
 
 def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=False):
     free_space = space - shadow_space
@@ -190,6 +200,7 @@ def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=Fa
     else:
         back.paste(image, ((side_space+shadow_space//2), side_space))
     return back
+
 
 def custom_upload(args=[], preset="custom"):
     global SHOTPATH, SHOTNAME
@@ -255,6 +266,7 @@ def custom_upload(args=[], preset="custom"):
     else:
         return response.text
 
+
 def imgur_upload(customArgs):
     global SHOTPATH
     imgur_id, imgur_link, clipboard, called = customArgs
@@ -272,3 +284,49 @@ def imgur_upload(customArgs):
     if clipboard or called:
         call(f"echo {jtext['data']['link']} | xclip -sel clip", shell=True)
     return jtext["data"]["link"]
+
+
+def decode(image):
+    red_channel, green_channel, blue_channel, *alpha = image.convert('RGB').split()
+    x, y = image.size[0], image.size[1]  
+
+    text = ''
+    delim = '001011110010110100101111'
+
+    for x_pixel in range(x):
+        for y_pixel in range(y):
+            bin_im_pixel = bin(red_channel.getpixel((x_pixel, y_pixel)))
+            text += bin_im_pixel[-1]
+            if len(text) > len(delim):
+                if delim in text[-24:]:
+                    text = text[:-24]
+                    return (int(text, 2).to_bytes((len(text) + 7) // 8, 'big')).decode()
+    
+    return (int(text, 2).to_bytes((len(text) + 7) // 8, 'big')).decode()
+
+
+def encode(text, image, savepath):
+    red_channel, green_channel, blue_channel, *alpha = image.split()
+    x, y = image.size[0], image.size[1]
+
+    counter = 0
+    delim = '001011110010110100101111'
+    bin_text = bin(int(binascii.hexlify(text.encode()),16))[2:]
+
+    for x_cord in range(x):
+        for y_cord in range(y):
+            if counter >= len(bin_text):
+                if bin_text == delim:
+                    if alpha:
+                        result = Image.merge("RGBA", [red_channel, green_channel, blue_channel, alpha[0]])
+                    else:
+                        result = Image.merge("RGB", [red_channel, green_channel, blue_channel])
+                    result.save(savepath, 'PNG')
+                    return f"Saved!"
+                counter = 0
+                bin_text = delim
+            bin_im_pixel = bin(red_channel.getpixel((x_cord, y_cord)))
+            bin_im_pixel = bin_im_pixel[:-1] + '1' if bin_text[counter] == '1' else bin_im_pixel[:-1] + '0'
+
+            red_channel.putpixel((x_cord, y_cord), int(bin_im_pixel, base=2))
+            counter+=1

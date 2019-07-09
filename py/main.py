@@ -12,12 +12,14 @@ import overlay
 import processing
 
 class ScreenWindow(overlay.BaseLayer):
+    __slots__ = ()
+
     def __init__(self):
         super().__init__()
         self.move(self.left, self.top)
         processing.scrot(self.screen)
         #update screenshot name and path
-        processing.SHOTNAME = fr"{processing.datetime.now().strftime('%d-%b-%Y_%H-%M-%S')}.png"
+        processing.SHOTNAME = fr"{processing.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
         processing.SHOTPATH[0] = f"/tmp/{processing.SHOTNAME}"
         processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}" if args[
             "directory"] != None else None
@@ -166,6 +168,8 @@ class ScreenWindow(overlay.BaseLayer):
         self.update()
 
 class InitListener(QtCore.QThread):
+    __slots__ = ("parent")
+
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
@@ -179,6 +183,7 @@ class InitListener(QtCore.QThread):
             sleep(1)
 
 class Tray(QtWidgets.QWidget):
+    __slots__ = ()
     trigger = QtCore.pyqtSignal()
     
     def __init__(self):
@@ -230,6 +235,8 @@ class Tray(QtWidgets.QWidget):
         self.config = EditConfig()
 
 class SaveDialog(QtWidgets.QWidget):
+    __slots__ = ()
+
     def __init__(self):
         super().__init__()
         __screen = QtWidgets.QDesktopWidget().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
@@ -239,6 +246,7 @@ class SaveDialog(QtWidgets.QWidget):
         self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2)), 400, 320)
         self.setFixedSize(400, 320)
         self.setWindowTitle("Save / Upload")
+        self.error_dialog = QtWidgets.QErrorMessage()
         
         self.args = []
         self.fname = processing.SHOTPATH[1] if (processing.SHOTPATH[1] != None) else (
@@ -249,16 +257,29 @@ class SaveDialog(QtWidgets.QWidget):
     def initLayout(self):
         self.layout = QtWidgets.QVBoxLayout(self)
         self.tabs = QtWidgets.QTabWidget()
+        
         self.tab1 = QtWidgets.QWidget()	
         self.tab2 = QtWidgets.QWidget()
+        self.tab3 = QtWidgets.QWidget()
+        self.tab4 = QtWidgets.QWidget()
+        
         self.tabs.addTab(self.tab1,"Main")
         self.tabs.addTab(self.tab2,"Upload to host")
+        self.tabs.addTab(self.tab3,"Encode")
+        self.tabs.addTab(self.tab4,"Decode")
+        
         self.initTabOne()
         self.initTabTwo()
+        self.initTabThree()
+        self.initTabFour()
+        
         self.layout.addWidget(self.tabs)
+        
         self.push_settings = QtWidgets.QPushButton("Config")
         self.push_settings.clicked.connect(self.initConfig)
+        
         self.layout.addWidget(self.push_settings, QtCore.Qt.AlignRight)
+        
         self.setLayout(self.layout)
 
     def initTabOne(self):
@@ -268,31 +289,42 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab1.main_0_wrapper.setTitle("Save to")
         self.tab1.main_0_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        
         self.tab1.main_1_layout = QtWidgets.QHBoxLayout()
         self.tab1.vertical_wrapper = QtWidgets.QVBoxLayout()
+        
         self.textbox = QtWidgets.QLineEdit(f"{processing.SHOTNAME}")
         self.textbox.textChanged.connect(self.changeTextboxFilename)
+        
         self.save = QtWidgets.QPushButton("Browse")
         self.save.clicked.connect(self.askFilename)
+        
         self.checktext0 = QtWidgets.QLabel("Copy to clipboard:")
+        
         self.checkbox0 = QtWidgets.QCheckBox()
         self.checkbox0.setChecked(True)
+        
         self.checkbox1 = QtWidgets.QCheckBox()
         self.checkbox1.setChecked(config.shadowDraw)
+        
         self.checktext1 = QtWidgets.QLabel("Draw shadows:")
+        
         self.tab1.main_0_layout.addWidget(self.textbox, 1, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.save, 1, 1, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checktext0, 2, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checkbox0, 2, 1, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checktext1, 3, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.checkbox1, 3, 1, 1, 1)
+        
         self.donebutton = QtWidgets.QPushButton("Save and quit")
         self.donebutton.clicked.connect(self.jobIsDone)
         self.tab1.main_1_layout.addStretch(1)
+
         self.tab1.main_1_layout.addWidget(self.donebutton)
         self.tab1.main_0_wrapper.setLayout(self.tab1.main_0_layout)
         self.tab1.vertical_wrapper.addWidget(self.tab1.main_0_wrapper)
         self.tab1.vertical_wrapper.addLayout(self.tab1.main_1_layout)
+        
         self.tab1.setLayout(self.tab1.vertical_wrapper)
     
     def initTabTwo(self):
@@ -302,62 +334,197 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab2.upload_wrapper.setTitle("Custom")
         self.tab2.upload_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        
         self.tab2.upload_hlayouts_wrapper = QtWidgets.QVBoxLayout()
         self.tab2.upload_presets_layout = QtWidgets.QHBoxLayout()
         self.tab2.upload_0_hlayout = QtWidgets.QHBoxLayout()
         self.tab2.upload_1_hlayout = QtWidgets.QHBoxLayout()
+        
         #CUSTOM
         self.presets_label = QtWidgets.QLabel("Presets:")
+        
         self.presets = QtWidgets.QComboBox()
         self.presets.addItems(["custom", "catbox.moe", "uguu.se"])
         self.presets.currentIndexChanged.connect(self.setPresets)
+        
         self.tab2.upload_presets_layout.addWidget(self.presets_label)
         self.tab2.upload_presets_layout.addWidget(self.presets)
+        
         self.filename_title = QtWidgets.QLabel("Filename:")
         self.push_filename = QtWidgets.QLineEdit(self)
         self.push_filename.setText(f"{processing.SHOTNAME}")
         self.push_filename.textChanged.connect(self.changeUploadFilename)
+        
         self.push_image = QtWidgets.QPushButton("Upload")
         self.push_image.clicked.connect(self.pushUpload)
+        
         self.push_link = QtWidgets.QLineEdit("Result link")
         self.push_link.setDisabled(True)
+        
         for i in [self.filename_title, self.push_filename, self.push_image]:
             self.tab2.upload_0_hlayout.addWidget(i)
         self.tab2.upload_1_hlayout.addWidget(self.push_link)
+        
         self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_presets_layout)
         self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_0_hlayout)
         self.tab2.upload_hlayouts_wrapper.addLayout(self.tab2.upload_1_hlayout)
+        
         self.tab2.upload_wrapper.setLayout(self.tab2.upload_hlayouts_wrapper)
+        
         #IMGUR
         self.tab2.upload_imgur_wrapper = QtWidgets.QGroupBox()
         self.tab2.upload_imgur_wrapper.setFixedSize(355, 80)
         self.tab2.upload_imgur_wrapper.setTitle("Imgur")
         self.tab2.upload_imgur_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        
         self.tab2.upload_imgur_hlayouts_wrapper = QtWidgets.QVBoxLayout()
         self.tab2.upload_imgur_0_hlayout = QtWidgets.QHBoxLayout()
         self.tab2.upload_imgur_1_hlayout = QtWidgets.QHBoxLayout()
+        
         self.push_imgur_image = QtWidgets.QPushButton("Upload")
         self.push_imgur_image.clicked.connect(self.pushImgurUpload)
+
         self.push_imgur_link = QtWidgets.QLineEdit("Result link")
         self.push_imgur_link.setDisabled(True)
+        
         self.tab2.upload_imgur_0_hlayout.addWidget(self.push_imgur_image)
         self.tab2.upload_imgur_1_hlayout.addWidget(self.push_imgur_link)
+
         self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_0_hlayout)
         self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_1_hlayout)
+
         self.tab2.upload_imgur_wrapper.setLayout(self.tab2.upload_imgur_hlayouts_wrapper)
+        
         self.checkbox_tab2 = QtWidgets.QCheckBox()
         self.checkbox_tab2.setChecked(config.shadowDraw)
+
         self.checktext_tab2 = QtWidgets.QLabel("Draw shadows:")
+        
         self.tab2.shadowHLayout = QtWidgets.QHBoxLayout()
         self.tab2.shadowHLayout.addWidget(self.checktext_tab2)
         self.tab2.shadowHLayout.addWidget(self.checkbox_tab2)
         self.tab2.shadowHLayout.addStretch(1)
+        
         self.tab2.vertical_wrapper.addLayout(self.tab2.shadowHLayout)
+
         self.tab2.vertical_wrapper.addWidget(self.tab2.upload_wrapper)
         self.tab2.vertical_wrapper.addWidget(self.tab2.upload_imgur_wrapper)
+        
         self.tab2.setLayout(self.tab2.vertical_wrapper)
-    
+
+    def initTabThree(self):
+        self.t3_image = None
+        self.t3_message = ""
+        self.t3_fname = processing.SHOTNAME
+
+        self.tab3.main_0_layout = QtWidgets.QGridLayout()
+        self.tab3.main_0_wrapper = QtWidgets.QGroupBox()
+        self.tab3.main_0_wrapper.setFixedSize(355, 140)
+        self.tab3.main_0_wrapper.setTitle("Hide text in the image")
+        self.tab3.main_0_wrapper.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        
+        self.tab3.main_1_layout = QtWidgets.QGroupBox()
+        self.tab3.main_1_box = QtWidgets.QGridLayout()
+        self.tab3.main_1_layout.setTitle("Save to")
+        self.tab3.main_1_layout.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        
+        self.tab3.vertical_wrapper = QtWidgets.QVBoxLayout()
+
+        self.saveto = QtWidgets.QLineEdit(self.t3_fname)
+        self.saveto.textChanged.connect(self.changeTextboxFilename)
+
+        self.findpath = QtWidgets.QPushButton("Browse")
+        self.findpath.clicked.connect(self.askFilename)
+
+        self.textbox_label = QtWidgets.QLabel("Message")
+
+        self.chooser_label = QtWidgets.QLabel("Image")
+        self.chooser_options = QtWidgets.QComboBox()
+        self.chooser_options.addItems(["current", "custom"])
+        self.chooser_options.currentIndexChanged.connect(self.setChooser)
+
+        self.t3_textbox = QtWidgets.QLineEdit(self.t3_image)
+        self.t3_textbox.textChanged.connect(self.changeFilePath)
+
+        self.textbox_q = QtWidgets.QPlainTextEdit()
+        self.textbox_q.textChanged.connect(self.changeMessage)
+
+        self.t3_save = QtWidgets.QPushButton("Browse")
+        self.t3_save.clicked.connect(self.askForFile)
+
+        self.t3_textbox.setDisabled(True)
+        self.t3_save.setDisabled(True)
+
+        self.encryptbutton = QtWidgets.QPushButton("Encode")
+        self.encryptbutton.clicked.connect(self.encode)
+
+        self.tab3.main_0_layout.addWidget(self.chooser_label, 1, 0, 1, 1)
+        self.tab3.main_0_layout.addWidget(self.chooser_options, 1, 1, 1, 1)
+        self.tab3.main_0_layout.addWidget(self.t3_textbox, 2, 0, 1, 1)
+        self.tab3.main_0_layout.addWidget(self.t3_save, 2, 1, 1, 1)
+        self.tab3.main_0_layout.addWidget(self.textbox_label, 3, 0, 1, 1)
+        self.tab3.main_0_layout.addWidget(self.textbox_q, 4, 0, 1, 1)
+
+        self.err_label = QtWidgets.QLabel("")
+
+        self.tab3.main_1_box.addWidget(self.saveto, 1, 0, 1, 1)
+        self.tab3.main_1_box.addWidget(self.findpath, 1, 1, 1, 1)
+        self.tab3.main_1_box.addWidget(self.err_label, 3, 0, 1, 1)
+        self.tab3.main_1_box.addWidget(self.encryptbutton, 3, 1, 1, 1)
+
+        self.tab3.main_0_wrapper.setLayout(self.tab3.main_0_layout)
+        self.tab3.main_1_layout.setLayout(self.tab3.main_1_box)
+
+        self.tab3.vertical_wrapper.addWidget(self.tab3.main_0_wrapper)
+        self.tab3.vertical_wrapper.addWidget(self.tab3.main_1_layout)
+
+        self.tab3.setLayout(self.tab3.vertical_wrapper)
+
+    def initTabFour(self):
+        self.t4_message = ""
+        self.t4_image = None
+
+        self.tab4.main_0_layout = QtWidgets.QGridLayout()
+
+        self.tab4.main_0_wrapper = QtWidgets.QGroupBox()
+        self.tab4.main_0_wrapper.setFixedSize(355, 180)
+        self.tab4.main_0_wrapper.setTitle("Decode")
+        self.tab4.main_0_wrapper.setStyleSheet(r"""
+        QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
+        
+        self.tab4.vertical_wrapper = QtWidgets.QVBoxLayout()
+
+        self.t4_textbox_label = QtWidgets.QLabel("Message")
+        self.t4_textbox = QtWidgets.QLineEdit()
+        self.t4_textbox.textChanged.connect(self.getFilePath)
+
+        self.t4_textbox_q = QtWidgets.QPlainTextEdit()
+        self.t4_textbox_q.textChanged.connect(self.changeMessage)
+
+        self.t4_open = QtWidgets.QPushButton("Browse")
+        self.t4_open.clicked.connect(self.askForFile)
+
+        self.decodebutton = QtWidgets.QPushButton("Decode")
+        self.decodebutton.clicked.connect(self.decode)
+
+        self.t4_err_label = QtWidgets.QLabel("")
+
+        self.tab4.main_0_layout.addWidget(self.t4_textbox, 1, 0, 1, 1)
+        self.tab4.main_0_layout.addWidget(self.t4_open, 1, 1, 1, 1)
+        self.tab4.main_0_layout.addWidget(self.t4_textbox_label, 2, 0, 1, 1)
+        self.tab4.main_0_layout.addWidget(self.t4_textbox_q, 3, 0, 1, 1)
+        self.tab4.main_0_layout.addWidget(self.decodebutton)
+        self.tab4.main_0_layout.addWidget(self.t4_err_label, 4, 0, 1, 1)
+
+        self.tab4.main_0_wrapper.setLayout(self.tab4.main_0_layout)
+
+        self.tab4.vertical_wrapper.addWidget(self.tab4.main_0_wrapper)
+
+        self.tab4.setLayout(self.tab4.vertical_wrapper)
+
     def initConfig(self):
         self.config = EditConfig()
 
@@ -374,6 +541,7 @@ class SaveDialog(QtWidgets.QWidget):
         self.fname = self.new_path[0] if self.new_path[0] else self.fname
         path = self.fname if self.fname.lower().endswith('.png') else self.fname+'.png'
         self.textbox.setText(path)
+        self.saveto.setText(path)
 
 
     def jobIsDone(self):
@@ -382,6 +550,8 @@ class SaveDialog(QtWidgets.QWidget):
         shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
         filename = self.fname if isinstance(self.fname, str) else self.fname[0]
         filename = filename if '.png' in filename.lower() else filename+'.png'
+        if filename == '.png':
+            filename = processing.SHOTNAME
         if not '/' in filename:
             if processing.SHOTPATH[1]:
                 filename = processing.SHOTPATH[1].replace(processing.SHOTNAME, filename)
@@ -405,12 +575,91 @@ class SaveDialog(QtWidgets.QWidget):
 
     def changeTextboxFilename(self):
         self.fname = self.textbox.text()
+        self.t3_fname = self.saveto.text()
 
     def changeUploadFilename(self):
         processing.SHOTNAME = self.push_filename.text()
 
     def setPresets(self):
         self.upload_preset = self.presets.currentText()
+
+    def setChooser(self):
+        if self.chooser_options.currentText() == "current":
+            self.t3_save.setDisabled(True)
+            self.t3_textbox.setDisabled(True)
+            self.t3_image = None
+        else:
+            self.t3_save.setDisabled(False)
+            self.t3_textbox.setDisabled(False)
+
+    def changeFilePath(self):
+        self.t3_image = self.t3_textbox.text()
+
+    def getFilePath(self):
+        self.t4_image = self.t4_textbox.text()
+
+    def askForFile(self):
+        new_image = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose file', '', 'png (*.png *.)')
+        self.t3_image = new_image[0] if new_image[0] else self.t3_image
+        if not self.t3_image.endswith(".png"):
+            pass
+        else:
+            self.t3_textbox.setText(self.t3_image)
+            self.t4_textbox.setText(self.t3_image)
+
+    def changeMessage(self):
+        self.t3_message = self.textbox_q.toPlainText()
+        self.textbox_q.setStyleSheet("")
+
+    def encode(self):
+        savepath = self.t3_fname if isinstance(self.t3_fname, str) else self.t3_fname[0]
+        savepath = savepath if '.png' in savepath.lower() else savepath+'.png'
+        if savepath == '.png':
+            savepath = processing.SHOTNAME
+        if not '/' in savepath:
+            if processing.SHOTPATH[1]:
+                savepath = processing.SHOTPATH[1].replace(processing.SHOTNAME, savepath)
+            else:
+                savepath = f"/home/{environ['USER']}/"+savepath
+        if '~/' in savepath:
+            savepath = savepath.replace('~/', f"/home/{environ['USER']}/")
+        try:
+            image = processing.Image.open(self.t3_image
+            ) if self.t3_image != None else processing.TEMP
+            res = processing.encode(self.t3_message, image, savepath)
+            self.err_label.setText(res)
+            self.saveto.setStyleSheet("border: 2px solid green; border-radius: 3px;")
+        except PermissionError as e:
+            self.err_label.setText("Permission denied")
+            self.saveto.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+        except ValueError as e:
+            self.err_label.setText("Your message is empty")
+            self.textbox_q.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+        except FileNotFoundError:
+            self.err_label.setText("File not found")
+            self.saveto.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+
+    def decode(self):
+        openpath = self.t4_image
+        try:
+            self.t4_textbox.setStyleSheet("")
+            image = processing.Image.open(openpath) if openpath and '/' in openpath else None
+            if image:
+                result = processing.decode(image)
+                self.t4_err_label.setText("")
+                self.t4_textbox_q.setPlainText(result)
+                self.t4_textbox_q.setStyleSheet("border: 2px solid green; border-radius: 3px;")
+            else:
+                raise ValueError
+        except PermissionError:
+            self.t4_err_label.setText("Permission denied")
+            self.t4_textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+        except UnicodeDecodeError as e:
+            self.t4_err_label.setText(f"Image is not encoded or is invalid.")
+            self.t4_textbox_q.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+        except (ValueError, AttributeError, IsADirectoryError, FileNotFoundError):
+            self.t4_err_label.setText("Path or image is invalid")
+            self.t4_textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
     def pushUpload(self):
         self.shadow = int(self.checkbox_tab2.isChecked())
@@ -468,6 +717,8 @@ class SaveDialog(QtWidgets.QWidget):
             return error_text
 
 class EditConfig(QtWidgets.QWidget):
+    __slots__ = ()
+
     def __init__(self):
         super().__init__()
         __screen = QtWidgets.QDesktopWidget().screenNumber(QtWidgets.QApplication.desktop().cursor().pos())
@@ -482,9 +733,9 @@ class EditConfig(QtWidgets.QWidget):
 
     def initLayout(self):
         self.layout = QtWidgets.QVBoxLayout(self)
-        self.shadows_config = QtWidgets.QGroupBox()
-        self.custom_config = QtWidgets.QGroupBox()
-        self.imgur_config = QtWidgets.QGroupBox()
+        self.shadows_config, self.custom_config, self.imgur_config = [
+            QtWidgets.QGroupBox() for i in range(3)
+        ]
         self.imgur_config.setTitle("Imgur")
         self.shadows_config.setTitle("Shadows")
         self.custom_config.setTitle("Custom upload")
@@ -657,6 +908,8 @@ class EditConfig(QtWidgets.QWidget):
 
 
 class ReadConfig(QtWidgets.QWidget):
+    __slots__ = ()
+
     def __init__(self):
         super().__init__()
         self.script_path = path.dirname(path.realpath(__file__))

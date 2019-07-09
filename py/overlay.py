@@ -2,8 +2,6 @@
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSize, Qt
-from PIL.ImageQt import ImageQt
-import processing
 
 class BaseLayer(QtWidgets.QWidget):
     def __init__(self):

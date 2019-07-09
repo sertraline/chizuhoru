@@ -48,6 +48,12 @@ class NoLinkException(Exception):
 
 
 def scrot(screen=-1, path=""):
+    """
+    mss screenshot. 
+    screen: screen count.
+    path: path to save image. 
+    path = processing.SHOTPATH[0] or processing.SHOTPATH[1] if -d is set.
+    """
     global TEMP
     sct = mss.mss()
     mon = sct.monitors[screen+1]
@@ -64,11 +70,19 @@ def scrot(screen=-1, path=""):
         TEMP = img
 
 
-def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, shadowargs=[]):
-    """Crops an image with given coordinates of selected rectangle; if
-    no rectangle given, saves the image to the clipboard."""
-    global TEMP
+def convert(rectangle_pos=[], clip=1, shadowargs=[]):
+    """
+    Crops an image with given coordinates of selected rectangle; if no rectangle is given, 
+    saves the image to the clipboard.
+    rectangle_pos = [rectangle width, rectangle height, rectangle x, rectangle y],
+    where x, y: position relative to the original image.
+
+    clip: call XClip if copy to clipboard is set.
+    shadowargs: if not empty, gets shadow configuration from the user and passes it to drawshadow().
+    """
+    global TEMP, SHOTPATH
     img = TEMP
+    rectwidth, rectheight, rectx, recty = rectangle_pos
     if "-" in str(rectwidth):
         rectx = rectx + rectwidth
         rectwidth = abs(rectwidth)
@@ -76,7 +90,7 @@ def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, sha
         recty = recty + rectheight
         rectheight = abs(rectheight)
     crop = img.crop((rectx, recty, (rectwidth + rectx), (rectheight + recty)))
-    if shadow == 1:
+    if shadowargs:
         crop = drawshadow(crop, shadowargs[0], shadowargs[1], shadowargs[2], shadowargs[3])
     if SHOTPATH[1] != None:
         crop.save(SHOTPATH[1])
@@ -89,7 +103,9 @@ def convert(rectwidth, rectheight, rectx, recty, SHOTPATH, clip=1, shadow=0, sha
 
 
 def grep_window():
-    """Get window coordinates under the mouse pointer"""
+    """
+    Get window coordinates under the mouse pointer.
+    """
     display = Display()
     window = display.screen().root
     result = window.query_pointer()
@@ -97,10 +113,17 @@ def grep_window():
     return (dims.width, dims.height, dims.x, dims.y)
 
 
-def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
-    """Blurs a rectangle with given coordinates"""
+def blur(rectangle_pos, actions):
+    """
+    Blurs a rectangle with given coordinates.
+    rectangle_pos = [rectangle width, rectangle height, rectangle x, rectangle y],
+    where x, y: position relative to the original image.
+
+    actions: preserve copy on the Stack in order to use undo.
+    """
     global TEMP
     img = TEMP
+    rectwidth, rectheight, rectx, recty = rectangle_pos
     actions.push(copy(img))
     if "-" in str(rectwidth):
         rectx = rectx + rectwidth
@@ -115,7 +138,13 @@ def blur(rectwidth, rectheight, rectx, recty, SHOTPATH, actions):
 
 
 def circle(begin, end, thickness, actions, pen, brush):
-    """Draws a circle using aggdraw module"""
+    """
+    Draws a circle using aggdraw module.
+    begin, end: QPoint coordinates.
+    thickness: circle size.
+    actions: preserve copy on the Stack in order to use undo.
+    pen: circle color.
+    """
     global TEMP
     img = TEMP
     actions.push(copy(img))
@@ -139,7 +168,13 @@ def circle(begin, end, thickness, actions, pen, brush):
 
 
 def drawrectangle(begin, end, thickness, actions, pen, brush):
-    """Draws a rectangle using aggdraw module"""
+    """
+    Draws a rectangle using aggdraw module.
+    begin, end: QPoint coordinates.
+    thickness: rectangle size.
+    actions: preserve copy on the Stack in order to use undo.
+    pen: rectangle color.
+    """
     global TEMP
     img = TEMP
     actions.push(copy(img))
@@ -162,7 +197,13 @@ def drawrectangle(begin, end, thickness, actions, pen, brush):
 
 
 def drawline(begin, end, thickness, actions, pen):
-    """Draws a line using aggdraw module"""
+    """
+    Draws a line using aggdraw module.
+    begin, end: QPoint coordinates.
+    thickness: line size.
+    actions: preserve copy on the Stack in order to use undo.
+    pen: line color.
+    """
     global TEMP
     img = TEMP
     actions.push(copy(img))
@@ -175,6 +216,14 @@ def drawline(begin, end, thickness, actions, pen):
 
 
 def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=False):
+    """
+    Draws shadow around the image.
+    image = PIL.Image.
+    space: space around the image.
+    shadow_space: shadow size.
+    iterations: draw shadows n-times.
+    round_corners: round original image corners.
+    """
     free_space = space - shadow_space
     side_space = free_space//2
     background = (0, 0, 0, 0)
@@ -203,6 +252,11 @@ def drawshadow(image, space=150, shadow_space=4, iterations=26, round_corners=Fa
 
 
 def custom_upload(args=[], preset="custom"):
+    """
+    Uses retrieved arguments to upload screenshot.
+    args = [access_token, username, password, send_filename, link_to_upload]
+    preset: upload using already existing configuration. presets = ["uguu.se", "catbox.moe"]
+    """
     global SHOTPATH, SHOTNAME
     shotpath = SHOTPATH[1] if SHOTPATH[1] else SHOTPATH[0]
     name = SHOTNAME
@@ -268,6 +322,10 @@ def custom_upload(args=[], preset="custom"):
 
 
 def imgur_upload(customArgs):
+    """
+    Uploads picture to imgur.
+    customArgs = [imgur_user_id, imgur_user_link, copy_link_to_clipboard]
+    """
     global SHOTPATH
     imgur_id, imgur_link, clipboard, called = customArgs
     if not imgur_link:
@@ -287,6 +345,11 @@ def imgur_upload(customArgs):
 
 
 def decode(image):
+    """
+    Decodes image with encoded LSB.
+    image = PIL.Image. Is splitted into channels, red channel is used for decryption.
+    Reads until delimiter after the user message.
+    """
     red_channel, green_channel, blue_channel, *alpha = image.convert('RGB').split()
     x, y = image.size[0], image.size[1]  
 
@@ -306,6 +369,12 @@ def decode(image):
 
 
 def encode(text, image, savepath):
+    """
+    Encodes message to binary and changes image's least significant bit.
+    text = message to encode. 
+    image = PIL.Image. Is splitted into channels, red channel is used for encryption.
+    Pushes delimiter after the user message.
+    """
     red_channel, green_channel, blue_channel, *alpha = image.split()
     x, y = image.size[0], image.size[1]
 

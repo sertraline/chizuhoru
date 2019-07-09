@@ -16,23 +16,29 @@ class ScreenWindow(overlay.BaseLayer):
 
     def __init__(self):
         super().__init__()
+        # move instance to the current monitor
         self.move(self.left, self.top)
         processing.scrot(self.screen)
+
         #update screenshot name and path
         processing.SHOTNAME = fr"{processing.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
         processing.SHOTPATH[0] = f"/tmp/{processing.SHOTNAME}"
         processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}" if args[
             "directory"] != None else None
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
-        self.table_widget = SaveDialog()
-        self.showFullScreen()
+        self.save_dialog = SaveDialog()
         self.toolkit = overlay.Toolkit()
-        self.colorsDialog = overlay.LePalette()
+        self.color_palette = overlay.LePalette()
+
+        self.showFullScreen()
         self.background()
+
         self.actions = processing.Stack()
-        self.cords = None  #active window coordinates
+        self.cords = None  
+        # ^ active window coordinates
 
     def background(self):
+        # Renders screenshot as background
         img = ImageQt(processing.TEMP)
         oImage = QImage(img)
         sImage = oImage.scaled(QSize(self.width,self.height))
@@ -63,6 +69,7 @@ class ScreenWindow(overlay.BaseLayer):
             self.cords = None
     
     def redrawImage(self):
+        # updates background
         self.background()
         self.update()
 
@@ -71,12 +78,12 @@ class ScreenWindow(overlay.BaseLayer):
             remove(processing.SHOTPATH[0])
         self.close()
         self.toolkit.close()
-        self.colorsDialog.close()
+        self.color_palette.close()
   
     def hideScreen(self):
         self.hide()
         self.toolkit.hide()
-        self.colorsDialog.hide()
+        self.color_palette.hide()
 
     def mousePressEvent(self, event):
         self.begin = event.pos()
@@ -90,29 +97,23 @@ class ScreenWindow(overlay.BaseLayer):
     def mouseReleaseEvent(self, event):
         self.end = event.pos()
         self.update()
-        if self.colorsDialog.fill.isChecked():
-            self.colorsDialog.brush = 1
-        else:
-            self.colorsDialog.brush = 0
-        #ensure that we will have exactly a rectangle and not an accidental click
-        if self.toolkit.switch == 1 and abs(self.rectw) >= 2:
-            processing.blur(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH, self.actions)
-            self.redrawImage()
-            self.begin = QtCore.QPoint()
-            self.end = QtCore.QPoint()
-        elif self.toolkit.switch == 2 and self.begin != self.end:
-            processing.circle(self.begin, self.end, self.toolkit.thickness, self.actions, self.colorsDialog.pen, self.colorsDialog.brush)
-            self.redrawImage()
-            self.begin = QtCore.QPoint()
-            self.end = QtCore.QPoint()
-        elif self.toolkit.switch == 3 and self.begin != self.end:
-            processing.drawrectangle(self.begin, self.end, self.toolkit.thickness, self.actions, self.colorsDialog.pen, self.colorsDialog.brush)
-            self.redrawImage()
-            self.begin = QtCore.QPoint()
-            self.end = QtCore.QPoint()
-        elif self.toolkit.switch == 4 and self.begin.x() != self.end.x():
-            processing.drawline(self.begin, self.end, self.toolkit.thickness, self.actions, self.colorsDialog.pen)
-            self.redrawImage()
+        self.color_palette.brush = 1 if self.color_palette.fill.isChecked() else 0
+        # ensure that we will have exactly a rectangle and not an accidental click
+        if self.toolkit.switch != 0:
+            if self.toolkit.switch == 1 and abs(self.rectw) >= 2:
+                rectangle_pos = [self.rectw, self.recth, self.rectx, self.recty]
+                processing.blur(rectangle_pos, self.actions)
+            elif self.begin != self.end:
+                if self.toolkit.switch == 2:
+                    processing.circle(
+                        self.begin, self.end, self.toolkit.thickness, self.actions, self.color_palette.pen, self.color_palette.brush)
+                elif self.toolkit.switch == 3:
+                    processing.drawrectangle(
+                        self.begin, self.end, self.toolkit.thickness, self.actions, self.color_palette.pen, self.color_palette.brush)
+                elif self.toolkit.switch == 4:
+                    processing.drawline(
+                        self.begin, self.end, self.toolkit.thickness, self.actions, self.color_palette.pen)
+            self.redrawImage()     
             self.begin = QtCore.QPoint()
             self.end = QtCore.QPoint()
 
@@ -127,36 +128,40 @@ class ScreenWindow(overlay.BaseLayer):
     def keyPressEvent(self, qKeyEvent):
         if (qKeyEvent.nativeModifiers() == 4 or qKeyEvent.nativeModifiers() == 8196
         ) and (qKeyEvent.nativeScanCode() == 52):
-        #is responsible for Ctrl-Z both in English and Cyrillic moonspeak
+        # is responsible for Ctrl-Z both in English and Cyrillic moonspeak
             shouldi = self.actions.extract()
             if not shouldi:
                 self.redrawImage()
         if qKeyEvent.key() == QtCore.Qt.Key_Return:
-            shadow = int(self.table_widget.checkbox_tab2.isChecked())
-            shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
-            if abs(self.rectw) <= 1 and abs(self.recth) <= 1:
-                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=shadow, shadowargs=shadowargs)
+            if self.save_dialog.checkbox_tab2.isChecked():
+                shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
             else:
-                processing.convert(self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH, shadow=shadow, shadowargs=shadowargs)
+                shadowargs = []
+            if abs(self.rectw) <= 1 and abs(self.recth) <= 1:
+                rectangle_pos = [self.width, self.height, 0, 0]
+                processing.convert(rectangle_pos, shadowargs=shadowargs)
+            else:
+                rectangle_pos = [self.rectw, self.recth, self.rectx, self.recty]
+                processing.convert(rectangle_pos, shadowargs=shadowargs)
             self.closeScreen()
         if qKeyEvent.key() == QtCore.Qt.Key_Escape:
             self.closeScreen()
         if qKeyEvent.nativeScanCode() == 28: #"T" key
             if self.toolkit.isopened == 0:
                 self.toolkit.show()
-                self.colorsDialog.show()
+                self.color_palette.show()
                 self.toolkit.isopened = 1
             else:
                 self.toolkit.hide()
-                self.colorsDialog.hide()
+                self.color_palette.hide()
                 self.toolkit.isopened = 0
         if qKeyEvent.nativeScanCode() == 39: #"S" key
-            self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
+            self.save_dialog.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
             self.hideScreen()
-            self.table_widget.show()
+            self.save_dialog.show()
         if qKeyEvent.nativeScanCode() == 30: #"U" key
-            self.table_widget.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
-            self.table_widget.pushImgurUpload(is_out=True)
+            self.save_dialog.args = [self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH]
+            self.save_dialog.pushImgurUpload()
             self.close()
         if qKeyEvent.nativeScanCode() == 38: #"A" key
             self.hideScreen()
@@ -175,6 +180,7 @@ class InitListener(QtCore.QThread):
         self.parent = parent
 
     def run(self):
+        """Checks for attempts to run second instance"""
         while True:
             if path.isfile("/tmp/chizuhoru.pid.exit"):
                 remove("/tmp/chizuhoru.pid.exit")
@@ -195,6 +201,8 @@ class Tray(QtWidgets.QWidget):
         self.initScreen()
 
     def initScreen(self):
+        # remove the reference to the last ScreenWindow
+        # to clear some memory
         try:
             del self.window
         except AttributeError:
@@ -205,18 +213,22 @@ class Tray(QtWidgets.QWidget):
     def initTray(self):
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
         self.tray_icon.setIcon(QtGui.QIcon(f"{sys.path[0]}/src/ico.png"))
+
         self.listener = InitListener(parent=self)
         self.listener.start()
+
         show_action = QtWidgets.QAction("Show", self)
         config_action = QtWidgets.QAction("Configure", self)
         quit_action = QtWidgets.QAction("Exit", self)
         config_action.triggered.connect(self.initConfig)
         show_action.triggered.connect(self.initScreenCheck)
         quit_action.triggered.connect(self.close)
+
         tray_menu = QtWidgets.QMenu()
         tray_menu.addAction(show_action)
         tray_menu.addAction(config_action)
         tray_menu.addAction(quit_action)
+
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
 
@@ -227,10 +239,12 @@ class Tray(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def initScreenCheck(self):
-        if self.window.table_widget.isVisible():
+        if self.window.save_dialog.isVisible():
             print("Dialog already exists")
         else:
             self.initScreen()
+
+
     def initConfig(self):
         self.config = EditConfig()
 
@@ -243,11 +257,11 @@ class SaveDialog(QtWidgets.QWidget):
         __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
         self.screen = __screen
         self.height, self.width, self.left, self.top = __screen_geo.height(), __screen_geo.width(), __screen_geo.left(), __screen_geo.top()
-        self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2)), 400, 320)
-        self.setFixedSize(400, 320)
+        self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2)), 400, 350)
+        self.setFixedSize(400, 350)
         self.setWindowTitle("Save / Upload")
-        self.error_dialog = QtWidgets.QErrorMessage()
         
+        # args: retrieves self.rectw, self.recth, self.rectx, self.recty, processing.SHOTPATH
         self.args = []
         self.fname = processing.SHOTPATH[1] if (processing.SHOTPATH[1] != None) else (
             f"/home/{environ['USER']}/{processing.SHOTNAME}")
@@ -258,10 +272,9 @@ class SaveDialog(QtWidgets.QWidget):
         self.layout = QtWidgets.QVBoxLayout(self)
         self.tabs = QtWidgets.QTabWidget()
         
-        self.tab1 = QtWidgets.QWidget()	
-        self.tab2 = QtWidgets.QWidget()
-        self.tab3 = QtWidgets.QWidget()
-        self.tab4 = QtWidgets.QWidget()
+        self.tab1, self.tab2, self.tab3, self.tab4 = [
+            QtWidgets.QWidget() for i in range(4)
+        ]
         
         self.tabs.addTab(self.tab1,"Main")
         self.tabs.addTab(self.tab2,"Upload to host")
@@ -283,7 +296,9 @@ class SaveDialog(QtWidgets.QWidget):
         self.setLayout(self.layout)
 
     def initTabOne(self):
+        # Main tab
         self.tab1.main_0_layout = QtWidgets.QGridLayout()
+        # wrapper wraps main_0_layout
         self.tab1.main_0_wrapper = QtWidgets.QGroupBox()
         self.tab1.main_0_wrapper.setFixedSize(355, 110)
         self.tab1.main_0_wrapper.setTitle("Save to")
@@ -291,23 +306,24 @@ class SaveDialog(QtWidgets.QWidget):
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         
         self.tab1.main_1_layout = QtWidgets.QHBoxLayout()
+        # vertical wrapper wraps wrapper and main_1_layout
         self.tab1.vertical_wrapper = QtWidgets.QVBoxLayout()
         
+        # textbox: picture filename
         self.textbox = QtWidgets.QLineEdit(f"{processing.SHOTNAME}")
         self.textbox.textChanged.connect(self.changeTextboxFilename)
         
+        # file picker
         self.save = QtWidgets.QPushButton("Browse")
         self.save.clicked.connect(self.askFilename)
         
         self.checktext0 = QtWidgets.QLabel("Copy to clipboard:")
-        
         self.checkbox0 = QtWidgets.QCheckBox()
         self.checkbox0.setChecked(True)
         
+        self.checktext1 = QtWidgets.QLabel("Draw shadows:")
         self.checkbox1 = QtWidgets.QCheckBox()
         self.checkbox1.setChecked(config.shadowDraw)
-        
-        self.checktext1 = QtWidgets.QLabel("Draw shadows:")
         
         self.tab1.main_0_layout.addWidget(self.textbox, 1, 0, 1, 1)
         self.tab1.main_0_layout.addWidget(self.save, 1, 1, 1, 1)
@@ -328,21 +344,29 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab1.setLayout(self.tab1.vertical_wrapper)
     
     def initTabTwo(self):
+        # Upload to host tab
+        #
+        # vertical wrapper wraps shadowHLayout, upload_wrapper, upload_imgur_wrapper
+        # shadowHLayout -> draw shadows
+        # upload wrapper -> custom uploads
+        # upload_imgur_wrapper -> upload to imgur
         self.tab2.vertical_wrapper = QtWidgets.QVBoxLayout()
+        # upload_wrapper is responsible for custom uploads
         self.tab2.upload_wrapper = QtWidgets.QGroupBox()
         self.tab2.upload_wrapper.setFixedSize(355, 110)
         self.tab2.upload_wrapper.setTitle("Custom")
         self.tab2.upload_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         
+        # upload wrapper wraps uploads_hlayouts_wrapper
         self.tab2.upload_hlayouts_wrapper = QtWidgets.QVBoxLayout()
+        # upload_hlayouts_wrapper wraps upload_presets_layout, upload_0_hlayout, upload_1_hlayout
         self.tab2.upload_presets_layout = QtWidgets.QHBoxLayout()
         self.tab2.upload_0_hlayout = QtWidgets.QHBoxLayout()
         self.tab2.upload_1_hlayout = QtWidgets.QHBoxLayout()
         
         #CUSTOM
         self.presets_label = QtWidgets.QLabel("Presets:")
-        
         self.presets = QtWidgets.QComboBox()
         self.presets.addItems(["custom", "catbox.moe", "uguu.se"])
         self.presets.currentIndexChanged.connect(self.setPresets)
@@ -372,12 +396,14 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab2.upload_wrapper.setLayout(self.tab2.upload_hlayouts_wrapper)
         
         #IMGUR
+        # upload_imgur_wrapper wraps upload_imgur_hlayouts_wrapper
         self.tab2.upload_imgur_wrapper = QtWidgets.QGroupBox()
         self.tab2.upload_imgur_wrapper.setFixedSize(355, 80)
         self.tab2.upload_imgur_wrapper.setTitle("Imgur")
         self.tab2.upload_imgur_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         
+        # upload_imgur_hlayouts_wrapper wraps upload_imgur_0_hlayout, upload_imgur_1_hlayout
         self.tab2.upload_imgur_hlayouts_wrapper = QtWidgets.QVBoxLayout()
         self.tab2.upload_imgur_0_hlayout = QtWidgets.QHBoxLayout()
         self.tab2.upload_imgur_1_hlayout = QtWidgets.QHBoxLayout()
@@ -395,71 +421,73 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab2.upload_imgur_hlayouts_wrapper.addLayout(self.tab2.upload_imgur_1_hlayout)
 
         self.tab2.upload_imgur_wrapper.setLayout(self.tab2.upload_imgur_hlayouts_wrapper)
-        
+        # END OF THE IMGUR SECTION
+
         self.checkbox_tab2 = QtWidgets.QCheckBox()
         self.checkbox_tab2.setChecked(config.shadowDraw)
-
         self.checktext_tab2 = QtWidgets.QLabel("Draw shadows:")
         
+        # Set layouts for the whole tab:
         self.tab2.shadowHLayout = QtWidgets.QHBoxLayout()
         self.tab2.shadowHLayout.addWidget(self.checktext_tab2)
         self.tab2.shadowHLayout.addWidget(self.checkbox_tab2)
         self.tab2.shadowHLayout.addStretch(1)
         
         self.tab2.vertical_wrapper.addLayout(self.tab2.shadowHLayout)
-
         self.tab2.vertical_wrapper.addWidget(self.tab2.upload_wrapper)
         self.tab2.vertical_wrapper.addWidget(self.tab2.upload_imgur_wrapper)
         
         self.tab2.setLayout(self.tab2.vertical_wrapper)
 
     def initTabThree(self):
+        # Encode picture
+        # t3_image -> Image or image filepath
         self.t3_image = None
         self.t3_message = ""
+        # t3_fname -> path of result image
         self.t3_fname = processing.SHOTNAME
 
-        self.tab3.main_0_layout = QtWidgets.QGridLayout()
+        # vertical_wrapper wraps main_0_wrapper, main_1_layout
+        self.tab3.vertical_wrapper = QtWidgets.QVBoxLayout()
+        # main_0_wrapper wraps main_0_layout
         self.tab3.main_0_wrapper = QtWidgets.QGroupBox()
+        # main_0_layout is responsible for "Encoding" section
+        self.tab3.main_0_layout = QtWidgets.QGridLayout()
         self.tab3.main_0_wrapper.setFixedSize(355, 140)
         self.tab3.main_0_wrapper.setTitle("Hide text in the image")
         self.tab3.main_0_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         
+        # main_1_layout wraps main_1_box
         self.tab3.main_1_layout = QtWidgets.QGroupBox()
+        # main_1_box is responsible for "Save to" section
         self.tab3.main_1_box = QtWidgets.QGridLayout()
         self.tab3.main_1_layout.setTitle("Save to")
         self.tab3.main_1_layout.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
-        
-        self.tab3.vertical_wrapper = QtWidgets.QVBoxLayout()
-
-        self.saveto = QtWidgets.QLineEdit(self.t3_fname)
-        self.saveto.textChanged.connect(self.changeTextboxFilename)
-
-        self.findpath = QtWidgets.QPushButton("Browse")
-        self.findpath.clicked.connect(self.askFilename)
 
         self.textbox_label = QtWidgets.QLabel("Message")
 
         self.chooser_label = QtWidgets.QLabel("Image")
+        # chooser_options: use current image or choose custom
         self.chooser_options = QtWidgets.QComboBox()
         self.chooser_options.addItems(["current", "custom"])
         self.chooser_options.currentIndexChanged.connect(self.setChooser)
 
+        # t3_textbox: path of the custom image
         self.t3_textbox = QtWidgets.QLineEdit(self.t3_image)
         self.t3_textbox.textChanged.connect(self.changeFilePath)
-
-        self.textbox_q = QtWidgets.QPlainTextEdit()
-        self.textbox_q.textChanged.connect(self.changeMessage)
-
+        
+        # file picker -> openFile
         self.t3_save = QtWidgets.QPushButton("Browse")
         self.t3_save.clicked.connect(self.askForFile)
 
+        # encoding message box
+        self.textbox_q = QtWidgets.QPlainTextEdit()
+        self.textbox_q.textChanged.connect(self.changeMessage)
+
         self.t3_textbox.setDisabled(True)
         self.t3_save.setDisabled(True)
-
-        self.encryptbutton = QtWidgets.QPushButton("Encode")
-        self.encryptbutton.clicked.connect(self.encode)
 
         self.tab3.main_0_layout.addWidget(self.chooser_label, 1, 0, 1, 1)
         self.tab3.main_0_layout.addWidget(self.chooser_options, 1, 1, 1, 1)
@@ -468,7 +496,19 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab3.main_0_layout.addWidget(self.textbox_label, 3, 0, 1, 1)
         self.tab3.main_0_layout.addWidget(self.textbox_q, 4, 0, 1, 1)
 
+        # prints useful info or errors. Empty as default
         self.err_label = QtWidgets.QLabel("")
+
+        # where to save image: file path textbox
+        self.saveto = QtWidgets.QLineEdit(self.t3_fname)
+        self.saveto.textChanged.connect(self.changeTextboxFilename)
+        
+        # file picker -> saveFile
+        self.findpath = QtWidgets.QPushButton("Browse")
+        self.findpath.clicked.connect(self.askFilename)
+
+        self.encryptbutton = QtWidgets.QPushButton("Encode")
+        self.encryptbutton.clicked.connect(self.encode)
 
         self.tab3.main_1_box.addWidget(self.saveto, 1, 0, 1, 1)
         self.tab3.main_1_box.addWidget(self.findpath, 1, 1, 1, 1)
@@ -484,32 +524,41 @@ class SaveDialog(QtWidgets.QWidget):
         self.tab3.setLayout(self.tab3.vertical_wrapper)
 
     def initTabFour(self):
+        # Decode picture
         self.t4_message = ""
+        # t4_image: image to decode
         self.t4_image = None
 
-        self.tab4.main_0_layout = QtWidgets.QGridLayout()
+        # vertical_wrapper wraps main_0_wrapper
+        self.tab4.vertical_wrapper = QtWidgets.QVBoxLayout()
 
+        # main_0_wrapper wraps main_0_layout
         self.tab4.main_0_wrapper = QtWidgets.QGroupBox()
         self.tab4.main_0_wrapper.setFixedSize(355, 180)
         self.tab4.main_0_wrapper.setTitle("Decode")
         self.tab4.main_0_wrapper.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         
-        self.tab4.vertical_wrapper = QtWidgets.QVBoxLayout()
+        self.tab4.main_0_layout = QtWidgets.QGridLayout()
 
         self.t4_textbox_label = QtWidgets.QLabel("Message")
+
+        # t4_textbox: open image to decode textbox
         self.t4_textbox = QtWidgets.QLineEdit()
         self.t4_textbox.textChanged.connect(self.getFilePath)
-
-        self.t4_textbox_q = QtWidgets.QPlainTextEdit()
-        self.t4_textbox_q.textChanged.connect(self.changeMessage)
-
+       
+        # file picker -> openFile
         self.t4_open = QtWidgets.QPushButton("Browse")
         self.t4_open.clicked.connect(self.askForFile)
+
+        # decoded message
+        self.t4_textbox_q = QtWidgets.QPlainTextEdit()
+        self.t4_textbox_q.textChanged.connect(self.changeMessage)
 
         self.decodebutton = QtWidgets.QPushButton("Decode")
         self.decodebutton.clicked.connect(self.decode)
 
+        # prints useful info or errors. Empty as default
         self.t4_err_label = QtWidgets.QLabel("")
 
         self.tab4.main_0_layout.addWidget(self.t4_textbox, 1, 0, 1, 1)
@@ -535,6 +584,7 @@ class SaveDialog(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def askFilename(self):
+        # Calls qt filepicker to SAVE and sets textbox to new path value.
         self.fname = self.fname if isinstance(self.fname, str) else self.fname[0]
         self.new_path = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
         self.textbox.setStyleSheet("")
@@ -543,15 +593,10 @@ class SaveDialog(QtWidgets.QWidget):
         self.textbox.setText(path)
         self.saveto.setText(path)
 
-
-    def jobIsDone(self):
-        self.clip = int(self.checkbox0.isChecked())
-        self.shadow = int(self.checkbox1.isChecked())
-        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
-        filename = self.fname if isinstance(self.fname, str) else self.fname[0]
+    def retrieveFilename(self, name):
+        filename = name if isinstance(name, str) else name[0]
+        filename = processing.SHOTNAME if not filename else filename
         filename = filename if '.png' in filename.lower() else filename+'.png'
-        if filename == '.png':
-            filename = processing.SHOTNAME
         if not '/' in filename:
             if processing.SHOTPATH[1]:
                 filename = processing.SHOTPATH[1].replace(processing.SHOTNAME, filename)
@@ -560,13 +605,27 @@ class SaveDialog(QtWidgets.QWidget):
         if '~/' in filename:
             filename = filename.replace('~/', f"/home/{environ['USER']}/")
         processing.SHOTPATH[1] = filename
+        return filename
+
+    def jobIsDone(self):
+        # Saves image and exits.
+        # clip -> copy to clipboard
+        clip = int(self.checkbox0.isChecked())
+        # draw shadows
+        if self.checkbox1.isChecked():
+            shadowargs = [
+                config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
+        else:
+            shadowargs = []
+        filename = self.retrieveFilename(self.fname)
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
-                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
-                self.close()
+                rectangle_pos = [self.width, self.height, 0, 0]
+                processing.convert(rectangle_pos, clip, shadowargs=shadowargs)
             else:
-                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, self.clip, shadow=self.shadow, shadowargs=shadowargs)
-                self.close()
+                rectangle_pos = [self.args[0], self.args[1], self.args[2], self.args[3]]
+                processing.convert(rectangle_pos, clip, shadowargs=shadowargs)
+            self.close()
         except ValueError as e:
             pass
         except PermissionError:
@@ -574,16 +633,20 @@ class SaveDialog(QtWidgets.QWidget):
             self.textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
     def changeTextboxFilename(self):
+        # textbox from Main tab. Retrieves new filepath to save
         self.fname = self.textbox.text()
         self.t3_fname = self.saveto.text()
 
     def changeUploadFilename(self):
+        # push_filename from upload section. Retrieves new name
         processing.SHOTNAME = self.push_filename.text()
 
     def setPresets(self):
+        # presets from upload section. Retrieves upload preset
         self.upload_preset = self.presets.currentText()
 
     def setChooser(self):
+        # sets tab3 fields to disabled if user is using current screenshot
         if self.chooser_options.currentText() == "current":
             self.t3_save.setDisabled(True)
             self.t3_textbox.setDisabled(True)
@@ -593,12 +656,15 @@ class SaveDialog(QtWidgets.QWidget):
             self.t3_textbox.setDisabled(False)
 
     def changeFilePath(self):
+        # textbox from Encode tab. Sets to new path from user input
         self.t3_image = self.t3_textbox.text()
 
     def getFilePath(self):
+        # textbox from Decode tab. Sets to new path from user input
         self.t4_image = self.t4_textbox.text()
 
     def askForFile(self):
+        # calls qt filepicker to OPEN and sets textbox to new path value.
         new_image = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose file', '', 'png (*.png *.)')
         self.t3_image = new_image[0] if new_image[0] else self.t3_image
         if not self.t3_image.endswith(".png"):
@@ -608,22 +674,15 @@ class SaveDialog(QtWidgets.QWidget):
             self.t4_textbox.setText(self.t3_image)
 
     def changeMessage(self):
+        # textbox_q from Encode tab. Retrieves message to encode
         self.t3_message = self.textbox_q.toPlainText()
         self.textbox_q.setStyleSheet("")
 
     def encode(self):
-        savepath = self.t3_fname if isinstance(self.t3_fname, str) else self.t3_fname[0]
-        savepath = savepath if '.png' in savepath.lower() else savepath+'.png'
-        if savepath == '.png':
-            savepath = processing.SHOTNAME
-        if not '/' in savepath:
-            if processing.SHOTPATH[1]:
-                savepath = processing.SHOTPATH[1].replace(processing.SHOTNAME, savepath)
-            else:
-                savepath = f"/home/{environ['USER']}/"+savepath
-        if '~/' in savepath:
-            savepath = savepath.replace('~/', f"/home/{environ['USER']}/")
+        # savepath -> where to save
+        savepath = self.retrieveFilename(self.t3_fname)
         try:
+            # t3_image -> what to encode
             image = processing.Image.open(self.t3_image
             ) if self.t3_image != None else processing.TEMP
             res = processing.encode(self.t3_message, image, savepath)
@@ -640,6 +699,7 @@ class SaveDialog(QtWidgets.QWidget):
             self.saveto.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
     def decode(self):
+        # openpath -> what to decode
         openpath = self.t4_image
         try:
             self.t4_textbox.setStyleSheet("")
@@ -662,13 +722,17 @@ class SaveDialog(QtWidgets.QWidget):
             self.t4_textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
     def pushUpload(self):
-        self.shadow = int(self.checkbox_tab2.isChecked())
-        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
+        if self.checkbox_tab2.isChecked():
+            shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
+        else:
+            shadowargs = []
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
-                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+                rectangle_pos = [self.width, self.height, 0, 0]
+                processing.convert(rectangle_pos, shadowargs=shadowargs)
             else:
-                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+                rectangle_pos = [self.args[0], self.args[1], self.args[2], self.args[3]]
+                processing.convert(rectangle_pos, shadowargs=shadowargs)
             if self.upload_preset == "custom":
                 customArgs = [config.userCustomAccessToken, config.userCustomUsername, 
                 config.userCustomPassword, config.userCustomName, config.userCustomLink]
@@ -686,15 +750,19 @@ class SaveDialog(QtWidgets.QWidget):
             self.push_link.setText("Error: link is empty or invalid")
             self.push_link.setStyleSheet("border: 2px solid red; border-radius: 3px;")          
 
-    def pushImgurUpload(self, is_out=False):
-        self.shadow = int(self.checkbox_tab2.isChecked())
-        shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
-        customArgs = [config.userImgurID, config.userImgurLink, config.imgurClipboard, is_out]
+    def pushImgurUpload(self):
+        if self.checkbox_tab2.isChecked():
+            shadowargs = [config.userSpace, config.userShadowSize, config.userIterations, config.roundCorners]
+        else:
+            shadowargs = []
+        customArgs = [config.userImgurID, config.userImgurLink, config.imgurClipboard]
         try:
             if abs(self.args[0]) <= 1 and abs(self.args[1]) <= 1:
-                processing.convert(self.width, self.height, 0, 0, processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+                rectangle_pos = [self.width, self.height, 0, 0]
+                processing.convert(rectangle_pos, shadowargs=shadowargs)
             else:
-                processing.convert(self.args[0], self.args[1], self.args[2], self.args[3], processing.SHOTPATH, shadow=self.shadow, shadowargs=shadowargs)
+                rectangle_pos = [self.args[0], self.args[1], self.args[2], self.args[3]]
+                processing.convert(rectangle_pos, shadowargs=shadowargs)
             result = processing.imgur_upload(customArgs)
             self.push_imgur_link.setDisabled(False)
             self.push_imgur_link.setText(result)
@@ -702,7 +770,7 @@ class SaveDialog(QtWidgets.QWidget):
                 self.push_imgur_image.setText("Copied to clipboard")
             self.push_imgur_link.setStyleSheet("border: 2px solid green; border-radius: 3px;")
             self.push_imgur_image.setDisabled(True)
-            if not is_out and config.imgurClose:
+            if config.imgurClose:
                 self.close()
             return None
         except processing.requests.exceptions.ConnectionError as e:
@@ -725,8 +793,8 @@ class EditConfig(QtWidgets.QWidget):
         __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
         self.screen = __screen
         self.height, self.width, self.left, self.top = __screen_geo.height(), __screen_geo.width(), __screen_geo.left(), __screen_geo.top()
-        self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2 - 180)), 400, 440)
-        self.setFixedSize(400, 440)
+        self.setGeometry((self.left + (self.width / 2 - 200)), (self.top + (self.height / 2 - 180)), 400, 460)
+        self.setFixedSize(400, 460)
         self.setWindowTitle("Configuration")
         self.initLayout()
         self.show()
@@ -746,95 +814,132 @@ class EditConfig(QtWidgets.QWidget):
         self.custom_config.setStyleSheet(r"""
         QGroupBox{border: 1px solid black;margin-top: 0.5em;font: 12px consolas;}QGroupBox::title {top: -7px;left: 10px;}""")
         #SHADOWS
+        # shadows_v wraps shadows_h0, shadows_h1, shadows_h2, shadows_h3
         self.shadows_v = QtWidgets.QVBoxLayout()
+
+        # h-n represent new row
         self.shadows_h0 = QtWidgets.QHBoxLayout()
         self.shadows_h1 = QtWidgets.QHBoxLayout()
         self.shadows_h2 = QtWidgets.QHBoxLayout()
         self.shadows_h3 = QtWidgets.QHBoxLayout()
+
+        # shadows_h0 wraps free_space, free_space_label
         self.free_space = QtWidgets.QSpinBox()
         self.free_space.setRange(10, 240)
         self.free_space.setValue(config.userSpace)
         self.free_space.valueChanged[int].connect(self.changeFreeSpace)
         self.free_space_label = QtWidgets.QLabel("Offset from image:")
+
+        # shadows_h1 wraps shadow_size, shadow_size_label
         self.shadow_size = QtWidgets.QSpinBox()
         self.shadow_size.setRange(1, 100)
         self.shadow_size.setValue(config.userShadowSize)
         self.shadow_size.valueChanged.connect(self.changeShadowSize)
         self.shadow_size_label = QtWidgets.QLabel("Shadow size:")
+
+        # shadows_h2 wraps iterations, iterations_label
         self.iterations = QtWidgets.QSpinBox()
         self.iterations.setRange(1, 100)
         self.iterations.setValue(config.userIterations)
         self.iterations.valueChanged.connect(self.changeIterations)
         self.iterations_label = QtWidgets.QLabel("Shadow blur:")
+
+        # shadows_h3 wraps draw_shadows, draw_shadows_label, round_corners, round_corners_label
         self.draw_shadows_label = QtWidgets.QLabel("Draw shadows by default:")
         self.draw_shadows = QtWidgets.QCheckBox()
         self.draw_shadows.setChecked(config.shadowDraw)
         self.draw_shadows.stateChanged.connect(self.changeShadowDraw)
+
         self.round_corners_label = QtWidgets.QLabel("Round image corners:")
         self.round_corners = QtWidgets.QCheckBox()
         self.round_corners.setChecked(config.roundCorners)
         self.round_corners.stateChanged.connect(self.changeRoundCorners)
+
         self.shadows_h0.addWidget(self.free_space_label)
         self.shadows_h0.addWidget(self.free_space)
+
         self.shadows_h1.addWidget(self.shadow_size_label)
         self.shadows_h1.addWidget(self.shadow_size)
+
         self.shadows_h2.addWidget(self.iterations_label)
         self.shadows_h2.addWidget(self.iterations)
+
         self.shadows_h3.addWidget(self.draw_shadows_label)
         self.shadows_h3.addWidget(self.draw_shadows)
         self.shadows_h3.addWidget(self.round_corners_label)
         self.shadows_h3.addWidget(self.round_corners)
+
         self.shadows_v.addLayout(self.shadows_h0)
         self.shadows_v.addLayout(self.shadows_h1)
         self.shadows_v.addLayout(self.shadows_h2)
         self.shadows_v.addLayout(self.shadows_h3)
+
         self.shadows_config.setLayout(self.shadows_v)
+
         #CUSTOM UPLOAD
+        # custom_v wraps custom_h0, custom_h1, custom_h2, custom_h3, custom_h4, custom_h5
         self.custom_v = QtWidgets.QVBoxLayout()
+
         self.custom_h0, self.custom_h1, self.custom_h2, self.custom_h3, self.custom_h4, self.custom_h5 = [
             QtWidgets.QHBoxLayout() for i in range(0, 6)
         ]
+
         self.custom_access_token = QtWidgets.QLineEdit(config.userCustomAccessToken)
         self.custom_access_token.textChanged.connect(self.changeAPIKey)
         self.custom_access_token_label = QtWidgets.QLabel("Access token (in form 'headername MYTOKEN')")
         self.custom_access_token_description = QtWidgets.QLabel("Example: token yBj23soANO")
+
         self.custom_username = QtWidgets.QLineEdit(config.userCustomUsername)
         self.custom_username.textChanged.connect(self.changeCustomUsername)
         self.custom_username_label = QtWidgets.QLabel("Username:")
+
         self.custom_password = QtWidgets.QLineEdit(config.userCustomPassword)
         self.custom_password.textChanged.connect(self.changeCustomPassword)
         self.custom_password_label = QtWidgets.QLabel("Password:")
+
         self.custom_screenshot_name = QtWidgets.QSpinBox()
         self.custom_screenshot_name.setRange(0, 1)
         self.custom_screenshot_name.setValue(config.userCustomName)
         self.custom_screenshot_name.valueChanged.connect(self.changeScreenshotName)
         self.custom_screenshot_name_label = QtWidgets.QLabel("Send filename:")
+
         self.custom_link = QtWidgets.QLineEdit(config.userCustomLink)
         self.custom_link.textChanged.connect(self.changeCustomLink)
         self.custom_link_label = QtWidgets.QLabel("Custom link:")
+
         self.custom_h0.addWidget(self.custom_access_token_label, QtCore.Qt.AlignLeft)
         self.custom_h0.addWidget(self.custom_access_token, QtCore.Qt.AlignRight)
+
         self.custom_h1.addWidget(self.custom_access_token_description)
+
         self.custom_h2.addWidget(self.custom_username_label, QtCore.Qt.AlignLeft)
         self.custom_h2.addWidget(self.custom_username, QtCore.Qt.AlignRight)
+
         self.custom_h3.addWidget(self.custom_password_label, QtCore.Qt.AlignLeft)
         self.custom_h3.addWidget(self.custom_password, QtCore.Qt.AlignRight)
+
         self.custom_h4.addWidget(self.custom_screenshot_name_label, QtCore.Qt.AlignLeft)
         self.custom_h4.addWidget(self.custom_screenshot_name, QtCore.Qt.AlignRight)
+
         self.custom_h5.addWidget(self.custom_link_label, QtCore.Qt.AlignLeft)
         self.custom_h5.addWidget(self.custom_link, QtCore.Qt.AlignRight)
+
         self.custom_v.addLayout(self.custom_h0)
         self.custom_v.addLayout(self.custom_h1)
         self.custom_v.addLayout(self.custom_h2)
         self.custom_v.addLayout(self.custom_h3)
         self.custom_v.addLayout(self.custom_h4)
         self.custom_v.addLayout(self.custom_h5)
+
         self.custom_config.setLayout(self.custom_v)
 
         # IMGUR
+        # imgur_v wraps imgur_h0, imgur_h1
         self.imgur_v = QtWidgets.QVBoxLayout()
+
         self.imgur_h0 = QtWidgets.QHBoxLayout()
         self.imgur_h1 = QtWidgets.QHBoxLayout()
+
         self.imgur_checkbox0 = QtWidgets.QCheckBox()
         self.imgur_checkbox0.setChecked(config.imgurClipboard)
         self.imgur_checkbox0.stateChanged.connect(self.changeImgurClipboard)
@@ -845,11 +950,13 @@ class EditConfig(QtWidgets.QWidget):
 
         self.imgur_label_checkbox0 = QtWidgets.QLabel("Copy link to clipboard:")
         self.imgur_label_checkbox1 = QtWidgets.QLabel("Close on successful upload:")
+
         self.imgur_h0.addWidget(self.imgur_label_checkbox0)
         self.imgur_h0.addWidget(self.imgur_checkbox0)
         
         self.imgur_h1.addWidget(self.imgur_label_checkbox1)
         self.imgur_h1.addWidget(self.imgur_checkbox1)
+
         self.imgur_v.addLayout(self.imgur_h0)
         self.imgur_v.addLayout(self.imgur_h1)
         self.imgur_config.setLayout(self.imgur_v)
@@ -920,6 +1027,7 @@ class ReadConfig(QtWidgets.QWidget):
                 self.initValues()
         else:
             with open(f"{self.script_path}/config", "w") as file:
+                # sets default config if there is no such in script path
                 self.parse = {"config": 
                 {"shadows": {"space": 150, "shadow_space": 4, "iterations": 26, "draw_default": 0, "round_corners": 0}, 
                 "custom": {"access_token": "None", "username": "None", "password": "None", "name": 1, 
@@ -930,6 +1038,7 @@ class ReadConfig(QtWidgets.QWidget):
                 self.initValues()
 
     def initValues(self):
+        # get config values
         self.userSpace = self.parse["config"]["shadows"]["space"]
         self.userShadowSize = self.parse["config"]["shadows"]["shadow_space"]
         self.userIterations = self.parse["config"]["shadows"]["iterations"]

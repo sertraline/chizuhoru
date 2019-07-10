@@ -327,7 +327,7 @@ def imgur_upload(customArgs):
     customArgs = [imgur_user_id, imgur_user_link, copy_link_to_clipboard]
     """
     global SHOTPATH
-    imgur_id, imgur_link, clipboard, called = customArgs
+    imgur_id, imgur_link, clipboard = customArgs
     if not imgur_link:
         raise NoLinkException
     shotpath = SHOTPATH[1] if SHOTPATH[1] else SHOTPATH[0]
@@ -339,7 +339,7 @@ def imgur_upload(customArgs):
     }
     response = requests.post(imgur_link, headers=headers, files=files)
     jtext = json.loads(response.text)
-    if clipboard or called:
+    if clipboard:
         call(f"echo {jtext['data']['link']} | xclip -sel clip", shell=True)
     return jtext["data"]["link"]
 

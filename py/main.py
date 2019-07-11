@@ -480,7 +480,7 @@ class SaveDialog(QtWidgets.QWidget):
         
         # file picker -> openFile
         self.t3_save = QtWidgets.QPushButton("Browse")
-        self.t3_save.clicked.connect(self.askForFile)
+        self.t3_save.clicked.connect(lambda t3: self.askForFile(tab=3))
 
         # encoding message box
         self.textbox_q = QtWidgets.QPlainTextEdit()
@@ -549,7 +549,7 @@ class SaveDialog(QtWidgets.QWidget):
        
         # file picker -> openFile
         self.t4_open = QtWidgets.QPushButton("Browse")
-        self.t4_open.clicked.connect(self.askForFile)
+        self.t4_open.clicked.connect(lambda t4: self.askForFile(tab=4))
 
         # decoded message
         self.t4_textbox_q = QtWidgets.QPlainTextEdit()
@@ -663,14 +663,16 @@ class SaveDialog(QtWidgets.QWidget):
         # textbox from Decode tab. Sets to new path from user input
         self.t4_image = self.t4_textbox.text()
 
-    def askForFile(self):
+    def askForFile(self, tab):
         # calls qt filepicker to OPEN and sets textbox to new path value.
         new_image = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose file', '', 'png (*.png *.)')
-        self.t3_image = new_image[0] if new_image[0] else self.t3_image
-        if self.t3_image != None:
-            if self.t3_image.endswith('.png'):
-                self.t3_textbox.setText(self.t3_image)
-                self.t4_textbox.setText(self.t3_image)
+        image_path = new_image[0] if new_image[0] else None
+        if image_path != None:
+            if image_path.endswith('.png'):
+                if tab == 3:
+                    self.t3_textbox.setText(self.image_path)
+                elif tab == 4:
+                    self.t4_textbox.setText(self.image_path)
 
     def changeMessage(self):
         # textbox_q from Encode tab. Retrieves message to encode

@@ -670,9 +670,9 @@ class SaveDialog(QtWidgets.QWidget):
         if image_path != None:
             if image_path.endswith('.png'):
                 if tab == 3:
-                    self.t3_textbox.setText(self.image_path)
+                    self.t3_textbox.setText(image_path)
                 elif tab == 4:
-                    self.t4_textbox.setText(self.image_path)
+                    self.t4_textbox.setText(image_path)
 
     def changeMessage(self):
         # textbox_q from Encode tab. Retrieves message to encode
@@ -683,12 +683,17 @@ class SaveDialog(QtWidgets.QWidget):
         # savepath -> where to save
         savepath = self.retrieveFilename(self.t3_fname)
         try:
+            if not self.t3_image and self.t3_save.isEnabled():
+                # if textbox is empty and "Decode" is called
+                raise FileNotFoundError
             # t3_image -> what to encode
-            image = processing.Image.open(self.t3_image
-            ) if self.t3_image != None else processing.TEMP
+            image = processing.Image.open(self.retrieveFilename(self.t3_image)
+            ) if isinstance(self.t3_image, str) else processing.TEMP
             res = processing.encode(self.t3_message, image, savepath)
             self.err_label.setText(res)
             self.saveto.setStyleSheet("border: 2px solid green; border-radius: 3px;")
+            self.t3_textbox.setStyleSheet("")
+            self.textbox_q.setStyleSheet("")
         except PermissionError as e:
             self.err_label.setText("Permission denied")
             self.saveto.setStyleSheet("border: 2px solid red; border-radius: 3px;")
@@ -697,21 +702,20 @@ class SaveDialog(QtWidgets.QWidget):
             self.textbox_q.setStyleSheet("border: 2px solid red; border-radius: 3px;")
         except FileNotFoundError:
             self.err_label.setText("File not found")
-            self.saveto.setStyleSheet("border: 2px solid red; border-radius: 3px;")
+            self.t3_textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")
 
     def decode(self):
-        # openpath -> what to decode
-        openpath = self.t4_image
+        # t4_image -> what to decode
         try:
-            self.t4_textbox.setStyleSheet("")
-            image = processing.Image.open(openpath) if openpath and '/' in openpath else None
-            if image:
-                result = processing.decode(image)
-                self.t4_err_label.setText("")
-                self.t4_textbox_q.setPlainText(result)
-                self.t4_textbox_q.setStyleSheet("border: 2px solid green; border-radius: 3px;")
-            else:
+            if not self.t4_image:
                 raise ValueError
+            openpath = self.retrieveFilename(self.t4_image)
+            self.t4_textbox.setStyleSheet("")
+            image = processing.Image.open(openpath)
+            result = processing.decode(image)
+            self.t4_err_label.setText("")
+            self.t4_textbox_q.setPlainText(result)
+            self.t4_textbox_q.setStyleSheet("border: 2px solid green; border-radius: 3px;")
         except PermissionError:
             self.t4_err_label.setText("Permission denied")
             self.t4_textbox.setStyleSheet("border: 2px solid red; border-radius: 3px;")

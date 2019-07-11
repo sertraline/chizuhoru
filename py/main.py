@@ -667,11 +667,10 @@ class SaveDialog(QtWidgets.QWidget):
         # calls qt filepicker to OPEN and sets textbox to new path value.
         new_image = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose file', '', 'png (*.png *.)')
         self.t3_image = new_image[0] if new_image[0] else self.t3_image
-        if not self.t3_image.endswith(".png"):
-            pass
-        else:
-            self.t3_textbox.setText(self.t3_image)
-            self.t4_textbox.setText(self.t3_image)
+        if self.t3_image != None:
+            if self.t3_image.endswith('.png'):
+                self.t3_textbox.setText(self.t3_image)
+                self.t4_textbox.setText(self.t3_image)
 
     def changeMessage(self):
         # textbox_q from Encode tab. Retrieves message to encode

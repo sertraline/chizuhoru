@@ -20,7 +20,7 @@ class ScreenWindow(overlay.BaseLayer):
         self.move(self.left, self.top)
         processing.scrot(self.screen)
 
-        #update screenshot name and path
+        # update screenshot name and path
         processing.SHOTNAME = fr"{processing.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
         processing.SHOTPATH[0] = f"/tmp/{processing.SHOTNAME}"
         processing.SHOTPATH[1] = f"{args['directory']}/{processing.SHOTNAME}" if args[
@@ -97,7 +97,7 @@ class ScreenWindow(overlay.BaseLayer):
     def mouseReleaseEvent(self, event):
         self.end = event.pos()
         self.update()
-        self.color_palette.brush = 1 if self.color_palette.fill.isChecked() else 0
+        self.color_palette.brush = 1 if self.color_palette.fill == 1 else 0
         # ensure that we will have exactly a rectangle and not an accidental click
         if self.toolkit.switch != 0:
             if self.toolkit.switch == 1 and abs(self.rectw) >= 2:
@@ -589,9 +589,10 @@ class SaveDialog(QtWidgets.QWidget):
         self.new_path = QtWidgets.QFileDialog.getSaveFileName(self, 'Save file', self.fname, 'png (*.png *.)')
         self.textbox.setStyleSheet("")
         self.fname = self.new_path[0] if self.new_path[0] else self.fname
-        path = self.fname if self.fname.lower().endswith('.png') else self.fname+'.png'
-        self.textbox.setText(path)
-        self.saveto.setText(path)
+        if self.fname:
+            path = self.fname if self.fname.lower().endswith('.png') else self.fname+'.png'
+            self.textbox.setText(path)
+            self.saveto.setText(path)
 
     def retrieveFilename(self, name):
         filename = name if isinstance(name, str) else name[0]

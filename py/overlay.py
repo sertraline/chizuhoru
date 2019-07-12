@@ -21,7 +21,7 @@ class LePalette(BaseLayer):
     def __init__(self):
         super().__init__()
         self.move(self.left, self.top)
-        self.setGeometry((self.left + (self.width / 2 - 120)), (self.top + (self.height - 46)), 240, 20)
+        self.setGeometry((self.left + (self.width / 2 - 120)), (self.top + (self.height - 46)), 320, 20)
         self.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.pen = "#e81832"
@@ -30,44 +30,51 @@ class LePalette(BaseLayer):
 
     def initUI(self):
         red, blue, green, yellow, black, white = [QtWidgets.QPushButton("", self) for i in range(0, 6)]
-        self.fill = QtWidgets.QCheckBox("", self)
-        red.setGeometry(0, 0, 24, 20)
-        red.setStyleSheet("background-color: #e81832; border: 1px solid black;")
+        self.fill = 0
+        red.setGeometry(0, 0, 34, 20)
+        red.setStyleSheet("background-color: #f22c40; border: 1px solid black; border-right: 0;")
         red.clicked.connect(self.redded)
-        blue.setGeometry(20, 0, 24, 20)
-        blue.setStyleSheet("background-color: #2459c8; border: 1px solid black;")
+        blue.setGeometry(30, 0, 34, 20)
+        blue.setStyleSheet("background-color: #407ee7; border: 1px solid black; border-left: 0; border-right: 0;")
         blue.clicked.connect(self.blued)
-        green.setGeometry(40, 0, 24, 20)
-        green.setStyleSheet("background-color: #23c84f; border: 1px solid black;")
+        green.setGeometry(60, 0, 34, 20)
+        green.setStyleSheet("background-color: #5ab738; border: 1px solid black; border-left: 0;  border-right: 0;")
         green.clicked.connect(self.greened)
-        yellow.setGeometry(60, 0, 24, 20)
-        yellow.setStyleSheet("background-color: #c8ac23; border: 1px solid black;")
+        yellow.setGeometry(90, 0, 34, 20)
+        yellow.setStyleSheet("background-color: #d5911a; border: 1px solid black; border-left: 0;  border-right: 0;")
         yellow.clicked.connect(self.yellowed)
-        black.setGeometry(80, 0, 24, 20)
-        black.setStyleSheet("background-color: black; border: 1px solid black;")
+        black.setGeometry(120, 0, 34, 20)
+        black.setStyleSheet("background-color: black; border: 1px solid black; border-left: 0;  border-right: 0;")
         black.clicked.connect(self.blacked)
-        white.setGeometry(100, 0, 24, 20)
-        white.setStyleSheet("background-color: white; border: 1px solid black;")
+        white.setGeometry(150, 0, 34, 20)
+        white.setStyleSheet("background-color: white; border: 1px solid black; border-left: 0; ")
         white.clicked.connect(self.whited)
-        self.info = QtWidgets.QLabel(self)
-        self.info.setText('Fill:')
-        self.info.move(140, 0)
-        self.info.setStyleSheet("background-color: white; border: 1px solid black;")
-        self.fill.setGeometry(174, -2, 24, 24)
+        self.info = QtWidgets.QPushButton(self)
+        self.info.setText('  FILL  ')
+        self.info.move(200, 2)
+        self.info.setStyleSheet("background-color: white; border: 1px solid black; font-size: 8pt;")
+        self.info.clicked.connect(self.filled)
 
     @QtCore.pyqtSlot()
     def redded(self):
-        self.pen = "#e81832"
+        self.pen = "#f22c40"
     def blued(self):
-        self.pen = "#2459c8"
+        self.pen = "#407ee7"
     def greened(self):
-        self.pen = "#23c84f"
+        self.pen = "#5ab738"
     def yellowed(self):
-        self.pen = "#c8ac23"
+        self.pen = "#d5911a"
     def blacked(self):
         self.pen = "black"
     def whited(self):
         self.pen = "white"
+
+    def filled(self):
+        self.fill = 0 if self.fill == 1 else 1
+        if self.fill == 0:
+            self.info.setStyleSheet("background-color: white; border: 1px solid black; font-size: 8pt;")
+        else:
+            self.info.setStyleSheet("background-color: #7f7f7f; border: 1px solid black; font-size: 8pt;")
 
 class Toolkit(BaseLayer):
     def __init__(self):

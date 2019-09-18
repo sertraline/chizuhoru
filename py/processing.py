@@ -8,15 +8,19 @@ import mss, mss.tools
 from copy import copy
 from io import BytesIO
 from os import path, remove
+from sys import exit
 from subprocess import call
 from datetime import datetime
 from Xlib.display import Display
 from PIL import Image, ImageFilter, ImageDraw
+from PyQt5.QtGui import QImage
+from PyQt5.QtCore import QMimeData
 
 
 SHOTNAME = "{}.png".format(datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 SHOTPATH = ["/tmp/{}".format(SHOTNAME), None]
 TEMP = ''
+APP = None
 
 
 class Stack:
@@ -64,7 +68,7 @@ def scrot(screen=-1, path=""):
             Image.open(BytesIO(raw_bytes)).save(path)
         except PermissionError as e:
             print(f"Error writting to '{path}': {e}")
-            sys.exit(1)
+            exit(1)
     else:
         img = Image.open(BytesIO(raw_bytes))
         TEMP = img
@@ -80,8 +84,10 @@ def convert(rectangle_pos=[], clip=1, shadowargs=[]):
     clip: call XClip if copy to clipboard is set.
     shadowargs: if not empty, gets shadow configuration from the user and passes it to drawshadow().
     """
-    global TEMP, SHOTPATH
+    global APP, TEMP, SHOTPATH
     img = TEMP
+    app = APP
+
     rectwidth, rectheight, rectx, recty = rectangle_pos
     if "-" in str(rectwidth):
         rectx = rectx + rectwidth
@@ -94,12 +100,16 @@ def convert(rectangle_pos=[], clip=1, shadowargs=[]):
         crop = drawshadow(crop, shadowargs[0], shadowargs[1], shadowargs[2], shadowargs[3])
     if SHOTPATH[1] != None:
         crop.save(SHOTPATH[1])
-        if clip == 1:
-            call(["xclip", "-sel", "clip", "-t", "image/png", SHOTPATH[1]])
-    else:
-        crop.save(SHOTPATH[0])
-        if clip == 1:
-            call(["xclip", "-sel", "clip", "-t", "image/png", SHOTPATH[0]])
+    if clip == 1:
+        b = BytesIO()
+        crop.save(b, "PNG")
+        b.seek(0)
+        qim = QImage()
+        qim.loadFromData(b.getvalue())
+        app.clipboard().clear(mode=app.clipboard().Clipboard)
+        mim = QMimeData()
+        mim.setImageData(qim)
+        app.clipboard().setMimeData(mim, mode=app.clipboard().Clipboard)
 
 
 def grep_window():

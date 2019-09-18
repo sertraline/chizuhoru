@@ -1115,6 +1115,7 @@ if __name__ == '__main__':
             app = QtWidgets.QApplication(sys.argv)
             config = ReadConfig()
             stayInTray = Tray()
+            processing.APP = app
             stayInTray.show()
             app.aboutToQuit.connect(app.deleteLater)
             sys.exit(app.exec_())

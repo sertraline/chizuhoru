@@ -15,25 +15,22 @@
 ## Requirements
 
 ### Easy install
-Install XClip (see below).  
-Run `install.sh` to create virtualenv and gather all needed modules. Now you can run `chizuhoru` and bind PrtScr to it for convenience.
+Run `install.sh` to create virtualenv and gather all required modules. It generates `chizuhoru` shell script which you then can run and bind PrtScr to it for convenience.
 
-### Packages
+### Manual install
 
+#### Packages
 - Python **3.7+**
-- XClip (read [Clipboard persistence](https://wiki.ubuntu.com/ClipboardPersistence))
-  + `apt install xclip` for Ubuntu/Debian
-  + `pacman -S xclip` for Arch Linux
 - PyQt5
   + `apt install python3-pyqt5 pyqt5-dev-tools` for Ubuntu/Debian
   + `pacman -S pyqt5-common python-pyqt5` for Arch Linux
   + as for 2019, `python3 -m pip install PyQt5` also works fine.
-
-### Modules
+  
+#### Modules  
 Single command:  
 `python3 -m pip install -r requirements.txt`  
 
-Manually:
+Manually:  
 - Python Image Library
   + `python3 -m pip install Pillow`
 - [Python MSS](https://github.com/BoboTiG/python-mss)

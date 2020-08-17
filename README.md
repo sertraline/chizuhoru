@@ -15,7 +15,7 @@ You can bind PrtScr to it in your window manager to make use of global hotkey.
 
 ### Manual install  
 
-Clone:
+Clone:  
 `git clone https://github.com/sertraline/chizuhoru && cd chizuhoru`  
 
 Install modules:  

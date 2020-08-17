@@ -392,9 +392,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     pen_cnt += 1
                     args = self.history.pen[pen_cnt]
                     for pack in args:
-                        if pack[-1]:
-                            painter.setPen(pack[-1])
-                            painter.drawLine(*pack[0])
                         painter.setPen(pack[1])
                         painter.setBrush(pack[2])
                         painter.drawLine(*pack[0])

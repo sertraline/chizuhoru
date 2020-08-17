@@ -9,9 +9,7 @@ git clone https://github.com/sertraline/chizuhoru && cd chizuhoru
 ./install.sh
 ```
 
-`install.sh` will gather all required modules and will generate a `chizuhoru` launch script for you.  
-
-You can bind PrtScr to it in your window manager to make use of global hotkey.
+`install.sh` will gather all required modules and will generate a `chizuhoru` launch script for you. You can bind PrtScr to it in your window manager to make use of global hotkey.
 
 ### Manual install  
 

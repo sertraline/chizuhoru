@@ -40,7 +40,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.move(self.left, self.top)
 
         # make a screenshot
-        self.temp = self.screen.shot()
+        self.temp = self.screen.shot(mon=0)
         self.temp.seek(0)
 
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
@@ -400,6 +400,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     args = self.history.circle[circl_cnt]
                     if args[-1]:
                         painter.setPen(args[-1])
+                        painter.setBrush(args[2])
                         painter.drawEllipse(args[0])
                     painter.setPen(args[1])
                     painter.setBrush(args[2])
@@ -409,6 +410,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     args = self.history.rect[rect_cnt]
                     if args[-1]:
                         painter.setPen(args[-1])
+                        painter.setBrush(args[2])
                         painter.drawRect(args[0])
                     painter.setPen(args[1])
                     painter.setBrush(args[2])
@@ -418,7 +420,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     args = self.history.line[line_cnt]
                     if args[-1]:
                         painter.setPen(args[-1])
-                        painter.drawLine(args[0])
+                        painter.setBrush(args[2])
+                        painter.drawLine(*args[0])
                     painter.setPen(args[1])
                     painter.setBrush(args[2])
                     painter.drawLine(*args[0])
@@ -427,6 +430,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     args = self.history.free[free_cnt]
                     if args[-1]:
                         painter.setPen(args[-1])
+                        painter.setBrush(args[2])
                         painter.drawPath(args[0])
                     painter.setPen(args[1])
                     painter.setBrush(args[2])

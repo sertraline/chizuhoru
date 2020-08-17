@@ -24,23 +24,12 @@ else
         exit 1;
     fi;
 fi;
-if $pyt -c "import venv" &> /dev/null; then
-    echo "virtualenv found.";
-else
-    echo "no virtualenv found: installing...";
-    $pyt -m pip install virtualenv --user;
-fi;
-echo "Installing modules..."
-$pyt -m venv env
-source env/bin/activate
-$pyt -m pip install mss aggdraw requests Pillow PyQt5 Xlib
-deactivate
+# using virtualenv we lose 'Breeze' system style
+$pyt -m pip install mss requests PyQt5 Xlib setproctitle --user
 SCRIPT_PATH=$(dirname $(realpath -s $0))
 echo "Creating chizuhoru.sh..."
 echo """#!/bin/bash
-source $SCRIPT_PATH/env/bin/activate
 $pyt $SCRIPT_PATH/py/main.py \$* &
-deactivate
 exit 0
 """ > chizuhoru
 chmod +x chizuhoru

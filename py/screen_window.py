@@ -27,7 +27,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         self.app = app
         self.config = config
-        self.screen = ScreenshotCLI()
+        self.screen_unit = ScreenshotCLI()
 
         save_dir = self.config.parse["config"]["default_dir"]
         if not os.path.isdir(save_dir):
@@ -40,7 +40,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.move(self.left, self.top)
 
         # make a screenshot
-        self.temp = self.screen.shot(mon=0)
+        self.temp = self.screen_unit.shot(self.screen)
         self.temp.seek(0)
 
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \

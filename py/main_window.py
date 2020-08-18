@@ -72,8 +72,8 @@ class MainWindow(QtWidgets.QWidget):
                                                        __screen_geo.width(), \
                                                        __screen_geo.left(), \
                                                        __screen_geo.top()
-        self.setGeometry((self.left + (self.width / 2 - 200)),
-                         (self.top + (self.height / 2)),
+        self.setGeometry((self.left + (self.width / 2 - 300)),
+                         (self.top + (self.height / 2 - 175)),
                          600, 350)
 
         self.setFixedSize(600, 350)

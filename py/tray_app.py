@@ -93,11 +93,15 @@ class Tray(QtWidgets.QWidget):
         self.main_window = MainWindow(self, self.app, self.config, self.img_toolkit)
         self.main_window.setWindowIcon(self.chz_ico)
         self.main_window.show()
+        self.main_window.activateWindow()
+        self.main_window.raise_()
 
     def initTray(self):
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
         self.tray_icon.setIcon(self.chz_ico_tray)
+        self.app.setApplicationName('Chizuhoru')
 
+        self.tray_icon.activated.connect(lambda x: self.initCaptureCheck(default_delay=False))
         capture_action = QtWidgets.QAction("Capture", self)
         show_action = QtWidgets.QAction("Show", self)
         quit_action = QtWidgets.QAction("Exit", self)
@@ -118,17 +122,19 @@ class Tray(QtWidgets.QWidget):
         exit(0)
 
     @QtCore.pyqtSlot()
-    def initCaptureCheck(self):
+    def initCaptureCheck(self, default_delay=True):
         gc.collect()
         try:
             if self.window and self.window.isVisible():
                 print("Dialog already exists")
             else:
-                sleep(self.config.parse["config"]["default_delay"])
+                if default_delay:
+                    sleep(self.config.parse["config"]["default_delay"])
                 self.initCapture()
         except RuntimeError:
             # C++ window destroyed
-            sleep(self.config.parse["config"]["default_delay"])
+            if default_delay:
+                sleep(self.config.parse["config"]["default_delay"])
             self.initCapture()
 
     def initMainCheck(self):

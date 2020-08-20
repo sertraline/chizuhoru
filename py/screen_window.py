@@ -5,9 +5,11 @@ from PyQt5.QtCore import QSize, Qt, QPoint
 from PyQt5 import QtCore
 
 from datetime import datetime
+import json
 import os
 
 import qt_toolkit
+from main_window import HistoryItem
 
 class EventHistory:
     def __init__(self):
@@ -22,9 +24,10 @@ class EventHistory:
 
 class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
-    def __init__(self, app, config, image_toolkit):
+    def __init__(self, parent, app, config, image_toolkit):
         super().__init__()
 
+        self.parent = parent
         self.app = app
         self.config = config
         self.screen_unit = ScreenshotCLI()
@@ -66,6 +69,11 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         # track history to undo actions
         self.history = EventHistory()
 
+        # image history (save, upload)
+        _dirpath = os.path.dirname(os.path.realpath(__file__))
+        self.hist_dir = os.path.join(_dirpath, '../.history')
+        self.hist = os.path.join(self.hist_dir, 'index.json')
+
         # coordinates of X11 window under mouse button
         self.cords = None
 
@@ -73,6 +81,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         self.pen_point_list = []
         self.pen_cords_track_list = []
+
 
     def render_background(self):
         qimg = QtGui.QPixmap()
@@ -225,17 +234,20 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                                                 angle + 180).translated(current)
             cp2 = revTarget.p2()
 
-            if p == 1:
-                self.path.quadTo(cp2, current)
-            else:
-                if cp1:
-                    self.path.cubicTo(cp1, cp2, current)
+            try:
+                if p == 1:
+                    self.path.quadTo(cp2, current)
+                else:
+                    if cp1:
+                        self.path.cubicTo(cp1, cp2, current)
+            except TypeError:
+                return None
 
             revSource = QtCore.QLineF.fromPolar(target.length() * factor,
                                                 angle).translated(current)
             cp1 = revSource.p2()
-
-        self.path.quadTo(cp1, points[-1])
+        if cp1:
+            self.path.quadTo(cp1, points[-1])
 
     def rect_quadratic(self, rect):
         rectx, recty, rectw, recth = list(rect.getRect())
@@ -303,6 +315,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         if self.toolkit.switch == 5:
             self.buildPath()
+            if not self.path:
+                return
             self.history.sequence += 'f'
             self.history.free.append((self.path, pen, brush, pen_outline))
 
@@ -353,19 +367,19 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if self.toolkit.isVisible():
             self.toolkit.color_selected()
             return
-        if self.toolkit.pens.isVisible():
-            self.toolkit.pens_outline.setWindowOpacity(0)
-            self.toolkit.pens.close()
-            self.toolkit.pens_outline.close()
+        if self.toolkit.tools_config.isVisible():
+            self.toolkit.tools_config_outline.setWindowOpacity(0)
+            self.toolkit.tools_config.close()
+            self.toolkit.tools_config_outline.close()
         else:
-            self.toolkit.pens_outline.setWindowOpacity(0)
-            self.toolkit.pens_outline.setStyleSheet("background: #131313;")
-            self.toolkit.pens_outline.show()
-            self.toolkit.pens_outline.setWindowOpacity(0.6)
-            self.toolkit.pens_outline.raise_()
-            self.toolkit.pens.setWindowOpacity(1)
-            self.toolkit.pens.show()
-            self.toolkit.pens.raise_()
+            self.toolkit.tools_config_outline.setWindowOpacity(0)
+            self.toolkit.tools_config_outline.setStyleSheet("background: #131313;")
+            self.toolkit.tools_config_outline.show()
+            self.toolkit.tools_config_outline.setWindowOpacity(0.6)
+            self.toolkit.tools_config_outline.raise_()
+            self.toolkit.tools_config.setWindowOpacity(1)
+            self.toolkit.tools_config.show()
+            self.toolkit.tools_config.raise_()
 
     def keyPressEvent(self, qKeyEvent):
         if (qKeyEvent.modifiers() & Qt.ShiftModifier):
@@ -484,7 +498,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
     def keyReleaseEvent(self, qKeyEvent):
         self.quadratic = False
 
-    def save_image(self, from_dialog=None, clip_only=False):
+    def save_image(self, from_dialog=None, clip_only=False, push=True):
         def crop(image):
             rectwidth, rectheight, rectx, recty = (self.sel_rect.width(), 
                                                    self.sel_rect.height(),
@@ -514,8 +528,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             image = crop(image)
         if not from_dialog:
             image.save(self.filepath)
+            if push:
+                self.push_to_history(self.filepath, '', 'Save')
         else:
             image.save(from_dialog)
+            if push:
+                self.push_to_history(from_dialog, '', 'Save')
         # avoid overhead
         if self.config.parse['config']['canvas']['img_clip'] and self.sel_rect is not None:
             self.app.clipboard().setPixmap(QtGui.QPixmap.fromImage(image))
@@ -524,14 +542,81 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.closeScreen()
 
     def upload_image(self):
-        self.save_image()
+        self.save_image(push=False)
 
         service = self.config.parse['config']['canvas']['upload_service']
+        del_hash = None
         if service == 'Imgur':
-            res = self.img_toolkit.imgur_upload(self.config, self.filepath, randname=True)
+            res, del_hash = self.img_toolkit.imgur_upload(self.config, self.filepath, randname=True)
         elif service == 'catbox.moe':
             res = self.img_toolkit.catbox_upload(self.config, self.filepath, randname=True)
         else:
             res = self.img_toolkit.uguu_upload(self.config, self.filepath, randname=True)
         if res.strip():
             self.app.clipboard().setText(res)
+        self.push_to_history(self.filepath, res, service, del_hash)
+
+    def push_to_history(self, get_file, response, type_, delete_hash=None):
+        curr_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        thumb = QtGui.QImage(get_file)
+        thumb = thumb.scaled(100, 100, Qt.KeepAspectRatioByExpanding,
+                                       Qt.SmoothTransformation)
+        if thumb.width() > 100:
+            rect = QtCore.QRect( 
+                (thumb.width() - 100) / 2, 
+                (thumb.height() - 100) / 2, 
+                100, 
+                100, 
+            )
+            thumb = thumb.copy(rect)
+
+        data = {}
+        with open(self.hist, 'r') as file:
+            fdata = file.read()
+            if fdata:
+                data = json.loads(fdata)
+
+        if curr_date in data:
+            from time import time_ns
+            curr_date += ('-'+str(time_ns()))
+
+        thumb_name = os.path.join(self.hist_dir, curr_date+'.png')
+        thumb.save(thumb_name)
+
+        if type_ != 'Save':
+            type_ = "Upload — "+type_
+
+        data[curr_date] = {
+                            "Type":type_,
+                            "URL":response,
+                            "Path":get_file,
+                            "Thumb":thumb_name
+                            }
+        if delete_hash:
+            data[curr_date]['del_hash'] = delete_hash
+
+        with open(self.hist, 'w') as file:
+            file.write(str(json.dumps(data)))
+
+        if self.parent.main_window and self.parent.main_window.isVisible():
+            item = HistoryItem(self.parent.main_window)
+            if delete_hash:
+                item.del_hash = delete_hash
+            item.date.setText(curr_date)
+            item.type.setText(type_)
+            if type_ != 'Save':
+                item.set_info_url()
+                item.info.setText(response)
+            else:
+                item.set_info_path()
+                item.info.setText(get_file)
+
+            item.set_icon(thumb_name)
+
+            widget = QtWidgets.QListWidgetItem()
+
+            widget.setSizeHint(item.sizeHint())
+
+            self.parent.main_window.history_list.insertItem(0, widget)
+            self.parent.main_window.history_list.setItemWidget(widget, item)

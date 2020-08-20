@@ -63,7 +63,7 @@ class BaseLayerCanvas(QtWidgets.QLabel):
         self.end = QtCore.QPoint()
         self.last_x, self.last_y = None, None
 
-class PenSettingsOutline(QtWidgets.QDialog):
+class ToolsConfigOutline(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
@@ -91,6 +91,7 @@ class PenSettingsOutline(QtWidgets.QDialog):
         balloon_w  = 25
         wndRect = self.rect()
         self.wndRect = wndRect
+        # https://github.com/sharkpp/qtpopover
         poly_cords = (
             QPoint(wndRect.x(), wndRect.y()),
             QPoint(wndRect.x() + wndRect.width(), wndRect.y()),
@@ -110,7 +111,7 @@ class PenSettingsOutline(QtWidgets.QDialog):
         mask = QtGui.QRegion(poly)
         self.setMask(mask)
 
-class PenSettings(QtWidgets.QDialog):
+class ToolsConfig(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
@@ -133,12 +134,15 @@ class PenSettings(QtWidgets.QDialog):
                          self.parent.pos().y() - 120,
                          widget_width, widget_height)
 
-        self.red = "#c7282e"
-        self.yellow = "#dbb126"
-        self.green = "#1dc129"
-        self.blue = "#3496dd"
-        self.white = "#FFFFFF"
-        self.black = "#000000"
+        _palette = self.parent.config.parse['colors']
+        self.colors = {
+            'red': _palette['red'],
+            'yellow': _palette['yellow'],
+            'green': _palette['green'],
+            'blue': _palette['blue'],
+            'white': _palette['white'],
+            'black': _palette['black']
+        }
         self.initUI()
     
     def initUI(self):
@@ -150,15 +154,12 @@ class PenSettings(QtWidgets.QDialog):
         qf = QFrame()
         qf.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
 
+        lab = QLabel("Foreground color")
         two_1 = QHBoxLayout()
         two_2 = QHBoxLayout()
         two_3 = QHBoxLayout()
 
-        lab = QLabel("Foreground color")
-        self.red_pen, self.blue_pen, self.green_pen, \
-        self.yellow_pen, \
-            self.black_pen, self.white_pen = [QPushButton("",
-                                              self) for i in range(0, 6)]
+        self.pens = {x:QPushButton() for x in self.colors.keys()}
 
         self.btn_css = (
         """
@@ -188,25 +189,16 @@ class PenSettings(QtWidgets.QDialog):
         }
         """)
 
-        self.red_pen.setStyleSheet(self.btn_css % self.red)
-        self.red_pen.clicked.connect(self.red_pen_sel)
-        self.blue_pen.setStyleSheet(self.btn_css % self.blue)
-        self.blue_pen.clicked.connect(self.blue_pen_sel)
-        self.green_pen.setStyleSheet(self.btn_css % self.green)
-        self.green_pen.clicked.connect(self.green_pen_sel)
-        self.yellow_pen.setStyleSheet(self.btn_css % self.yellow)
-        self.yellow_pen.clicked.connect(self.yellow_pen_sel)
-        self.black_pen.setStyleSheet(self.btn_css % self.black)
-        self.black_pen.clicked.connect(self.black_pen_sel)
-        self.white_pen.setStyleSheet(self.btn_css % self.white)
-        self.white_pen.clicked.connect(self.white_pen_sel)
+        for key in self.pens.keys():
+            self.pens[key].setStyleSheet(self.btn_css % self.colors[key])
+            self.pens[key].clicked.connect(self.pen_sel)
 
-        two_1.addWidget(self.red_pen)
-        two_1.addWidget(self.blue_pen)
-        two_2.addWidget(self.green_pen)
-        two_2.addWidget(self.yellow_pen)
-        two_3.addWidget(self.black_pen)
-        two_3.addWidget(self.white_pen)
+        two_1.addWidget(self.pens['red'])
+        two_1.addWidget(self.pens['blue'])
+        two_2.addWidget(self.pens['green'])
+        two_2.addWidget(self.pens['yellow'])
+        two_3.addWidget(self.pens['black'])
+        two_3.addWidget(self.pens['white'])
 
         vbox_left_inner.addItem(two_1)
         vbox_left_inner.addItem(two_2)
@@ -227,35 +219,26 @@ class PenSettings(QtWidgets.QDialog):
 
         qf_brush = QFrame()
         qf_brush.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
+
+        lab_brush = QLabel("Background color")
         two_1_brush = QHBoxLayout()
         two_2_brush = QHBoxLayout()
         two_3_brush = QHBoxLayout()
+ 
+        self.brushes = {x:QPushButton() for x in self.colors.keys()}
 
-        lab_brush = QLabel("Background color")
-        self.red_brush, self.blue_brush, self.green_brush, \
-        self.yellow_brush, \
-            self.black_brush, self.white_brush = [QPushButton("",
-                                                  self) for i in range(0, 6)]
+        for cc, key in enumerate(self.brushes.keys()):
+            self.brushes[key].setStyleSheet(self.btn_css % self.colors[key])
+            self.brushes[key].clicked.connect(self.brush_sel)
 
-        self.red_brush.setStyleSheet(self.btn_css % self.red)
-        self.red_brush.clicked.connect(self.red_brush_sel)
-        self.blue_brush.setStyleSheet(self.btn_css % self.blue)
-        self.blue_brush.clicked.connect(self.blue_brush_sel)
-        self.green_brush.setStyleSheet(self.btn_css % self.green)
-        self.green_brush.clicked.connect(self.green_brush_sel)
-        self.yellow_brush.setStyleSheet(self.btn_css % self.yellow)
-        self.yellow_brush.clicked.connect(self.yellow_brush_sel)
-        self.black_brush.setStyleSheet(self.btn_css % self.black)
-        self.black_brush.clicked.connect(self.black_brush_sel)
-        self.white_brush.setStyleSheet(self.btn_css % self.white)
-        self.white_brush.clicked.connect(self.white_brush_sel)
+        two_1_brush.addWidget(self.brushes['red'])
+        two_1_brush.addWidget(self.brushes['blue'])
 
-        two_1_brush.addWidget(self.red_brush)
-        two_1_brush.addWidget(self.blue_brush)
-        two_2_brush.addWidget(self.green_brush)
-        two_2_brush.addWidget(self.yellow_brush)
-        two_3_brush.addWidget(self.black_brush)
-        two_3_brush.addWidget(self.white_brush)
+        two_2_brush.addWidget(self.brushes['green'])
+        two_2_brush.addWidget(self.brushes['yellow'])
+
+        two_3_brush.addWidget(self.brushes['black'])
+        two_3_brush.addWidget(self.brushes['white'])
 
         vbox_left_inner_brush.addItem(two_1_brush)
         vbox_left_inner_brush.addItem(two_2_brush)
@@ -287,8 +270,7 @@ class PenSettings(QtWidgets.QDialog):
         vbox.addItem(hbox_left_outer_1)
 
         right_frame = QFrame()
-        right_frame.setFrameStyle(QFrame().StyledPanel \
-                                  | QFrame().Sunken)
+        right_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
         inner_wrap = QVBoxLayout()
 
         vb_0 = QVBoxLayout()
@@ -429,18 +411,17 @@ class PenSettings(QtWidgets.QDialog):
 
     def update_pen_style(self):
         ind = self.style_qcomb.currentIndex()
-        styles = ["solid", "dash", "dot", "dashdot"]
-
-        if ind == 0:
-            self.parent.pen_style = Qt.SolidLine
-        elif ind == 1:
-            self.parent.pen_style = Qt.DashLine
-        elif ind == 2:
-            self.parent.pen_style = Qt.DotLine
-        else:
-            self.parent.pen_style = Qt.DashDotLine
+        styles = [
+                  ["solid", Qt.SolidLine],
+                  ["dash", Qt.DashLine],
+                  ["dot", Qt.DotLine],
+                  ["dashdot", Qt.DashDotLine]
+                ]
+        for i in range(4):
+            if ind == i:
+                self.parent.pen_style = styles[i][1]
         
-        self.parent.config.changeConfig("canvas", "last_style", styles[ind])
+        self.parent.config.changeConfig("canvas", "last_style", styles[ind][0])
 
     def update_pen_value(self, value):
         if type(value) is int:
@@ -484,7 +465,6 @@ class PenSettings(QtWidgets.QDialog):
         balloon_w = 25
         wndRect = self.rect()
         self.wndRect = wndRect
-        # https://github.com/sharkpp/qtpopover
         poly_cords = (
             QPoint(wndRect.x(), wndRect.y()),
             QPoint(wndRect.x() + wndRect.width(), wndRect.y()),
@@ -505,95 +485,44 @@ class PenSettings(QtWidgets.QDialog):
         self.setMask(mask)
 
     def reset_pen_btn_css(self):
-        self.red_pen.setStyleSheet(self.btn_css % self.red)
-        self.blue_pen.setStyleSheet(self.btn_css % self.blue)
-        self.green_pen.setStyleSheet(self.btn_css % self.green)
-        self.yellow_pen.setStyleSheet(self.btn_css % self.yellow)
-        self.black_pen.setStyleSheet(self.btn_css % self.black)
-        self.white_pen.setStyleSheet(self.btn_css % self.white)
+        for key in self.pens.keys():
+            self.pens[key].setStyleSheet(self.btn_css % self.colors[key])
 
     def reset_brush_btn_css(self):
-        self.red_brush.setStyleSheet(self.btn_css % self.red)
-        self.blue_brush.setStyleSheet(self.btn_css % self.blue)
-        self.green_brush.setStyleSheet(self.btn_css % self.green)
-        self.yellow_brush.setStyleSheet(self.btn_css % self.yellow)
-        self.black_brush.setStyleSheet(self.btn_css % self.black)
-        self.white_brush.setStyleSheet(self.btn_css % self.white)
+        for key in self.brushes.keys():
+            self.brushes[key].setStyleSheet(self.btn_css % self.colors[key])
 
     @QtCore.pyqtSlot()
-    def red_pen_sel(self):
-        self.reset_pen_btn_css()
-        self.red_pen.setStyleSheet(self.btn_css_active % self.red)
-        self.parent.current_pen_color = hex_to_rgb(self.red)
-        self.parent.config.changeConfig("canvas", "last_pen_color", self.red)
-        self.parent.update_pen_color()
-    def blue_pen_sel(self):
-        self.reset_pen_btn_css()
-        self.blue_pen.setStyleSheet(self.btn_css_active % self.blue)
-        self.parent.current_pen_color = hex_to_rgb(self.blue)
-        self.parent.config.changeConfig("canvas", "last_pen_color", self.blue)
-        self.parent.update_pen_color()
-    def green_pen_sel(self):
-        self.reset_pen_btn_css()
-        self.green_pen.setStyleSheet(self.btn_css_active % self.green)
-        self.parent.current_pen_color = hex_to_rgb(self.green)
-        self.parent.config.changeConfig("canvas", "last_pen_color", self.green)
-        self.parent.update_pen_color()
-    def yellow_pen_sel(self):
-        self.reset_pen_btn_css()
-        self.yellow_pen.setStyleSheet(self.btn_css_active % self.yellow)
-        self.parent.current_pen_color = hex_to_rgb(self.yellow)
-        self.parent.config.changeConfig("canvas", "last_pen_color", self.yellow)
-        self.parent.update_pen_color()
-    def black_pen_sel(self):
-        self.reset_pen_btn_css()
-        self.black_pen.setStyleSheet(self.btn_css_active % self.black)
-        self.parent.current_pen_color = hex_to_rgb(self.black)
-        self.parent.config.changeConfig("canvas", "last_pen_color", self.black)
-        self.parent.update_pen_color()
-    def white_pen_sel(self):
-        self.reset_pen_btn_css()
-        self.white_pen.setStyleSheet(self.btn_css_active % self.white)
-        self.parent.current_pen_color = hex_to_rgb(self.white)
-        self.parent.config.changeConfig("canvas", "last_pen_color", self.white)
-        self.parent.update_pen_color()
+    def pen_sel(self, key=None):
+        def submit(key):
+            self.reset_pen_btn_css()
+            self.pens[key].setStyleSheet(self.btn_css_active % self.colors[key])
+            self.parent.current_pen_color = hex_to_rgb(self.colors[key])
+            self.parent.config.changeConfig("canvas", "last_pen_color", self.colors[key])
+            self.parent.update_pen_color()
+        if key:
+            submit(key)
+            return
+        for key in self.pens.keys():
+            if self.sender() is self.pens[key]:
+                submit(key)
+                return
 
-    def red_brush_sel(self):
-        self.reset_brush_btn_css()
-        self.red_brush.setStyleSheet(self.btn_css_active % self.red)
-        self.parent.current_brush_color = hex_to_rgb(self.red)
-        self.parent.config.changeConfig("canvas", "last_brush_color", self.red) 
-        self.parent.update_brush_color()
-    def blue_brush_sel(self):
-        self.reset_brush_btn_css()
-        self.blue_brush.setStyleSheet(self.btn_css_active % self.blue)
-        self.parent.current_brush_color = hex_to_rgb(self.blue)
-        self.parent.config.changeConfig("canvas", "last_brush_color", self.blue)
-        self.parent.update_brush_color()
-    def green_brush_sel(self):
-        self.reset_brush_btn_css()
-        self.green_brush.setStyleSheet(self.btn_css_active % self.green)
-        self.parent.current_brush_color = hex_to_rgb(self.green)
-        self.parent.config.changeConfig("canvas", "last_brush_color", self.green)
-        self.parent.update_brush_color()
-    def yellow_brush_sel(self):
-        self.reset_brush_btn_css()
-        self.yellow_brush.setStyleSheet(self.btn_css_active % self.yellow)
-        self.parent.current_brush_color = hex_to_rgb(self.yellow)
-        self.parent.config.changeConfig("canvas", "last_brush_color", self.yellow)
-        self.parent.update_brush_color()
-    def black_brush_sel(self):
-        self.reset_brush_btn_css()
-        self.black_brush.setStyleSheet(self.btn_css_active % self.black)
-        self.parent.current_brush_color = hex_to_rgb(self.black)
-        self.parent.config.changeConfig("canvas", "last_brush_color", self.black)
-        self.parent.update_brush_color()
-    def white_brush_sel(self):
-        self.reset_brush_btn_css()
-        self.white_brush.setStyleSheet(self.btn_css_active % self.white)
-        self.parent.current_brush_color = hex_to_rgb(self.white)
-        self.parent.config.changeConfig("canvas", "last_brush_color", self.white)
-        self.parent.update_brush_color()
+    def brush_sel(self, key=None):
+        def submit(key):
+            self.reset_brush_btn_css()
+            self.brushes[key].setStyleSheet(self.btn_css_active % self.colors[key])
+            self.parent.current_brush_color = hex_to_rgb(self.colors[key])
+            self.parent.config.changeConfig("canvas", "last_brush_color", self.colors[key])
+            self.parent.update_brush_color()
+        if key:
+            submit(key)
+            return
+        for key in self.brushes.keys():
+            if self.sender() is self.brushes[key]:
+                submit(key)
+                return
+
 
 class Toolkit(BaseLayer):
     def __init__(self, parent, config):
@@ -610,6 +539,9 @@ class Toolkit(BaseLayer):
                          widget_width, widget_height)
 
         self.switch = 0
+        self.switches = [['free', 5], ['line', 4],
+                         ['rect', 3], ['circle', 2],
+                         ['pen', 1], ['sel', 0]]
 
         self.pen_op = self.config.parse["config"]["canvas"]["pen_opacity"]
         self.brush_op = self.config.parse["config"]["canvas"]["brush_opacity"]
@@ -620,16 +552,19 @@ class Toolkit(BaseLayer):
         _pen = self.config.parse["config"]["canvas"]["last_pen_color"]
         _brush = self.config.parse["config"]["canvas"]["last_brush_color"]
 
-        self.current_pen_color = hex_to_rgb("#c7282e") if not _pen else hex_to_rgb(_pen)
-        self.current_brush_color = hex_to_rgb("#c7282e") if not _brush else hex_to_rgb(_brush)
+        _def_col = self.parent.config.parse['colors']['red']
+        self.current_pen_color = hex_to_rgb(_def_col) if not _pen else hex_to_rgb(_pen)
+        self.current_brush_color = hex_to_rgb(_def_col) if not _brush else hex_to_rgb(_brush)
 
         self.update_pen_color()
         self.update_brush_color()
 
         self.pen_size = self.config.parse["config"]["canvas"]["last_size"]
 
-        styles = [["solid", Qt.SolidLine], ["dash", Qt.DashLine],
-                  ["dot", Qt.DotLine], ["dashdot", Qt.DashDotLine]]
+        styles = [["solid", Qt.SolidLine],
+                  ["dash", Qt.DashLine],
+                  ["dot", Qt.DotLine],
+                  ["dashdot", Qt.DashDotLine]]
 
         caps = [["square", Qt.SquareCap], ["round", Qt.RoundCap]]
 
@@ -652,49 +587,32 @@ class Toolkit(BaseLayer):
             if cap == c[0]:
                 self.cap = c[1]
 
-        self.pens = PenSettings(self)
-        self.pens_outline = PenSettingsOutline(self)
+        self.tools_config = ToolsConfig(self)
+        self.tools_config_outline = ToolsConfigOutline(self)
         if not _brush:
-            self.pens.red_brush_sel()
+            self.tools_config.brush_sel('red')
         else:
-            if _brush == self.pens.red:
-                self.pens.red_brush_sel()
-            elif _brush == self.pens.yellow:
-                self.pens.yellow_brush_sel()
-            elif _brush == self.pens.blue:
-                self.pens.blue_brush_sel()
-            elif _brush == self.pens.green:
-                self.pens.green_brush_sel()
-            elif _brush == self.pens.black:
-                self.pens.black_brush_sel()
-            else:
-                self.pens.white_brush_sel()
+            for key in self.tools_config.colors.keys():
+                if _brush == self.tools_config.colors[key]:
+                    self.tools_config.brush_sel(key)
         if not _pen:
-            self.pens.red_pen_sel()
+            self.tools_config.pen_sel('red')
         else:
-            if _pen == self.pens.red:
-                self.pens.red_pen_sel()
-            elif _pen == self.pens.yellow:
-                self.pens.yellow_pen_sel()
-            elif _pen == self.pens.blue:
-                self.pens.blue_pen_sel()
-            elif _pen == self.pens.green:
-                self.pens.green_pen_sel()
-            elif _pen == self.pens.black:
-                self.pens.black_pen_sel()
-            else:
-                self.pens.white_pen_sel()
+            for key in self.tools_config.colors.keys():
+                if _pen == self.tools_config.colors[key]:
+                    self.tools_config.pen_sel(key)
         self.initUI()
 
     def initUI(self):
         grid = QGridLayout(self)
 
-        self.select, self.rectangle, self.line, \
-            self.pen_btn, self.circle, self.close_btn, \
-                self.free_btn, self.color, \
-                    self.save, self.upload = [QPushButton() for i in range(10)]
+        _tools = ['sel', 'rect', 'line', 'pen',
+                  'circle', 'free', 'color', 
+                  'close', 'save', 'upload']
 
-        btn_css = (
+        self.tools = {x:QPushButton() for x in _tools}
+
+        self.btn_css = (
         """
         QPushButton {
             qproperty-icon: url(" ");
@@ -714,91 +632,42 @@ class Toolkit(BaseLayer):
         }
         """)
 
-        #close_css = btn_css.replace('64px', '32px')
-
         grid.setHorizontalSpacing(4)
         grid.setVerticalSpacing(8)
         self.setLayout(grid)
 
-        self.btn_css = {
-            "pen": "",
-            "free": "",
-            "sel": "",
-            "rect": "",
-            "line": "",
-            "circle": "",
-            "close": "",
-            "save": "",
-            "upload": "",
-            "color": ""
-        }
-        self.btn_css_active = {x:"" for x in self.btn_css.keys()}
-        for key in self.btn_css:
-            self.btn_css[key] = btn_css % (sys.path[0], key, sys.path[0],
-                                                            key+'_hover')
-        for key in self.btn_css_active:
-            self.btn_css_active[key] = btn_css % (sys.path[0], key+'_hover',
-                                                  sys.path[0], key+'_hover')
-
-        self.free_btn.clicked.connect(self.free_selected)
-        self.free_btn.setStyleSheet(self.btn_css['free'])
-        self.free_btn.setToolTip("Free shape tool")
-
-        self.color.clicked.connect(self.color_selected)
-        self.color.setStyleSheet(self.btn_css['color'])
-        self.color.setToolTip("Paint settings")
-
-        self.select.clicked.connect(self.selected)
-        self.select.setStyleSheet(self.btn_css['sel'])
-        self.select.setToolTip("Selection")
-
-        self.rectangle.clicked.connect(self.rect_selected)
-        self.rectangle.setStyleSheet(self.btn_css['rect'])
-        self.rectangle.setToolTip("Rectangle tool")
-
-        self.line.clicked.connect(self.line_selected)
-        self.line.setStyleSheet(self.btn_css['line'])
-        self.line.setToolTip("Line tool")
-
-        self.pen_btn.clicked.connect(self.pen_selected)
-        self.pen_btn.setStyleSheet(self.btn_css['pen'])
-        self.pen_btn.setToolTip("Pen tool")
-
-        self.circle.clicked.connect(self.circle_selected)
-        self.circle.setStyleSheet(self.btn_css['circle'])
-        self.circle.setToolTip("Circle tool")
-
-        self.close_btn.clicked.connect(self.close_clicked)
-        self.close_btn.setStyleSheet(self.btn_css['close'])
-        self.close_btn.setToolTip("Cancel")
-
-        self.save.setStyleSheet(self.btn_css['save'])
-        self.save.setToolTip("Save")
-        self.save.clicked.connect(self.save_action)
-        self.upload.setStyleSheet(self.btn_css['upload'])
-        self.upload.setToolTip("Upload")
-        self.upload.clicked.connect(self.parent.upload_image)
+        for key in self.tools.keys():
+            self.tools[key].setStyleSheet(self.get_css(key))
+            self.tools[key].clicked.connect(self.tool_sel)
 
         vspace = QSpacerItem(0, 0, QSizePolicy.Minimum,
                                    QSizePolicy.Expanding)
  
-        grid.addWidget(self.save, 0, 0)
-        grid.addWidget(self.upload, 0, 1)
-        grid.addWidget(self.close_btn, 0, 2)
-        grid.addWidget(self.select, 1, 1)
-        grid.addWidget(self.pen_btn, 2, 0)
-        grid.addWidget(self.color, 2, 1)
-        grid.addWidget(self.free_btn, 2, 2)
-        grid.addWidget(self.rectangle, 3, 0)
-        grid.addWidget(self.circle, 3, 1)
-        grid.addWidget(self.line, 3, 2)
+        grid.addWidget(self.tools['save'], 0, 0)
+        grid.addWidget(self.tools['upload'], 0, 1)
+        grid.addWidget(self.tools['close'], 0, 2)
+        grid.addWidget(self.tools['sel'], 1, 1)
+        grid.addWidget(self.tools['pen'], 2, 0)
+        grid.addWidget(self.tools['color'], 2, 1)
+        grid.addWidget(self.tools['free'], 2, 2)
+        grid.addWidget(self.tools['rect'], 3, 0)
+        grid.addWidget(self.tools['circle'], 3, 1)
+        grid.addWidget(self.tools['line'], 3, 2)
         grid.addItem(vspace, 4, 0, 1, -1)
 
+    def get_css(self, key, active=False):
+        if not active:
+            return self.btn_css % (sys.path[0], key,
+                                   sys.path[0], key+'_hover')
+        else:
+            return self.btn_css % (sys.path[0], key+'_hover',
+                                   sys.path[0], key+'_hover')
+
     def closeEvent(self, event):
-        self.pens_outline.setWindowOpacity(0)
-        self.pens_outline.close()
-        self.pens.setWindowOpacity(0)
-        self.pens.close()
+        self.tools_config_outline.setWindowOpacity(0)
+        self.tools_config_outline.close()
+        self.tools_config.setWindowOpacity(0)
+        self.tools_config.close()
         self.setWindowOpacity(0)
         self.close()
 
@@ -836,79 +705,71 @@ class Toolkit(BaseLayer):
     def update_brush_color(self):
         self.brush_color = QtGui.QColor(*self.current_brush_color, self.brush_op)
 
-    def redefine_css(self):
-        if self.switch == 5:
-            self.free_selected()
-        elif self.switch == 4:
-            self.line_selected()
-        elif self.switch == 3:
-            self.rect_selected()
-        elif self.switch == 2:
-            self.circle_selected()
-        elif self.switch == 1:
-            self.pen_selected()
-        else:
-            self.selected()
-
     def reset_css(self, check=True):
         if check:
             self.check_color()
-        self.line.setStyleSheet(self.btn_css['line'])
-        self.rectangle.setStyleSheet(self.btn_css['rect'])
-        self.circle.setStyleSheet(self.btn_css['circle'])
-        self.pen_btn.setStyleSheet(self.btn_css['pen'])
-        self.select.setStyleSheet(self.btn_css['sel'])
-        self.free_btn.setStyleSheet(self.btn_css['free'])
-        self.color.setStyleSheet(self.btn_css['color'])
+        for key in self.tools.keys():
+            self.tools[key].setStyleSheet(self.get_css(key))
+
+    def redefine_css(self):
+        self.reset_css()
+        for item in self.switches:
+            if item[1] == self.switch:
+                self.tool_sel(item[0])
 
     @QtCore.pyqtSlot()
+    def tool_sel(self, key=False):
+        def submit(key):
+            self.tools[key].setStyleSheet(self.get_css(key, True))
+            for switch in self.switches:
+                if key == switch[0]:
+                    self.switch = switch[1]
+
+        if key:
+            submit(key)
+            return
+
+        for key in self.tools.keys():
+            if self.sender() == self.tools[key]:
+                if key == 'color':
+                    self.color_selected()
+                    return
+                elif key == 'save':
+                    self.save_action()
+                    return
+                elif key == 'upload':
+                    self.parent.upload_image()
+                    return
+                elif key == 'close':
+                    self.close_clicked()
+                    return
+                else:
+                    self.reset_css()
+                    submit(key)
+                    return 
+
     def color_selected(self):
         self.reset_css(check=False)
-        if self.pens.isVisible():
-            self.color.setStyleSheet(self.btn_css['color'])
-            self.pens_outline.setWindowOpacity(0)
-            self.pens.close()
-            self.pens_outline.close()
+        if self.tools_config.isVisible():
+            self.tools['color'].setStyleSheet(self.get_css('color'))
+            self.tools_config_outline.setWindowOpacity(0)
+            self.tools_config.close()
+            self.tools_config_outline.close()
             self.redefine_css()
         else:
-            self.color.setStyleSheet(self.btn_css_active['color'])
-            self.pens_outline.setWindowOpacity(0)
-            self.pens_outline.setStyleSheet("background: #131313;")
-            self.pens_outline.show()
-            self.pens_outline.setWindowOpacity(0.6)
-            self.pens.setWindowOpacity(1)
-            self.pens.show()
-            self.pens_outline.raise_()
-            self.pens.raise_()
+            self.tools['color'].setStyleSheet(self.get_css('color', True))
+            self.tools_config_outline.setWindowOpacity(0)
+            self.tools_config_outline.setStyleSheet("background: #131313;")
+            self.tools_config_outline.show()
+            self.tools_config_outline.setWindowOpacity(0.6)
+            self.tools_config.setWindowOpacity(1)
+            self.tools_config.show()
+            self.tools_config_outline.raise_()
+            self.tools_config.raise_()
 
     def check_color(self):
-        if self.pens.isVisible():
-            self.color.setStyleSheet(self.btn_css['color'])
-            self.pens_outline.setWindowOpacity(0)
-            self.pens.close()
-            self.pens_outline.close()
-
-    def free_selected(self):
-        self.reset_css()
-        self.free_btn.setStyleSheet(self.btn_css_active['free'])
-        self.switch = 5
-    def line_selected(self):
-        self.reset_css()
-        self.line.setStyleSheet(self.btn_css_active['line'])
-        self.switch = 4
-    def rect_selected(self):
-        self.reset_css()
-        self.rectangle.setStyleSheet(self.btn_css_active['rect'])
-        self.switch = 3
-    def circle_selected(self):
-        self.reset_css()
-        self.circle.setStyleSheet(self.btn_css_active['circle'])
-        self.switch = 2
-    def pen_selected(self):
-        self.reset_css()
-        self.pen_btn.setStyleSheet(self.btn_css_active['pen'])
-        self.switch = 1
-    def selected(self):
-        self.reset_css()
-        self.select.setStyleSheet(self.btn_css_active['sel'])
-        self.switch = 0
+        if self.tools_config.isVisible():
+            self.tools['color'].setStyleSheet(self.get_css('color'))
+            self.tools_config_outline.setWindowOpacity(0)
+            self.tools_config.close()
+            self.tools_config_outline.close()

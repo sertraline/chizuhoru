@@ -31,9 +31,19 @@ class ImageToolkit():
         dims = result.child.get_geometry()
         return (dims.width, dims.height, dims.x, dims.y)
 
+    def get_name(self, ext):
+        name = str(uuid.uuid4())[:14].replace('-', '')
+        if len(ext)>1:
+            name = name+'.'+ext[-1]
+        return name
 
     def catbox_upload(self, config, filepath, randname=False, parent=False):
         link = "https://catbox.moe/user/api.php"
+
+        name = os.path.split(filepath)[1]
+        ext = filepath.split('.')
+        if randname:
+            name = self.get_name(ext)
 
         try:
             iof = open(filepath, 'rb')
@@ -42,9 +52,6 @@ class ImageToolkit():
                 parent.out.clear()
                 parent.out.setText(str(e))
             return
-        name = os.path.split(filepath)[1]
-        if randname:
-            name = str(uuid.uuid4())
 
         files = {
             'fileToUpload': (name, iof, 'image/png')
@@ -55,7 +62,7 @@ class ImageToolkit():
         }
         if parent:
             parent.out.clear()
-            text = f'POST {link}\n\n'
+            text = f'POST {link}\n<{name}>\n\n'
             parent.out.setText(text)
         try:
             response = requests.post(link, data=data, files=files, timeout=self.timeout)
@@ -76,8 +83,9 @@ class ImageToolkit():
         link = "https://uguu.se/api.php?d=upload-tool"
 
         name = os.path.split(filepath)[1]
+        ext = filepath.split('.')
         if randname:
-            name = str(uuid.uuid4())
+            name = self.get_name(ext)
 
         try:
             iof = open(filepath, 'rb')
@@ -93,7 +101,7 @@ class ImageToolkit():
         }
         if parent:
             parent.out.clear()
-            text = f'POST {link}\n\n'
+            text = f'POST {link}\n<{name}>\n\n'
             parent.out.setText(text)
         try:
             response = requests.post(link, files=files, timeout=self.timeout)
@@ -118,8 +126,9 @@ class ImageToolkit():
         }
 
         name = os.path.split(filepath)[1]
+        ext = filepath.split('.')
         if randname:
-            name = str(uuid.uuid4())
+            name = self.get_name(ext)
 
         try:
             iof = open(filepath, 'rb')
@@ -127,13 +136,14 @@ class ImageToolkit():
             if parent:
                 parent.out.clear()
                 parent.out.setText(str(e))
+            return None, None
 
         files = {
             'image': (name, iof),
         }
         if parent:
             parent.out.clear()
-            text = f'POST {imgur_url}\n{headers}\n\n'
+            text = f'POST {imgur_url}\n{headers}\n<{name}>\n\n'
             parent.out.setText(text)
         try:
             response = requests.post(imgur_url, headers=headers, files=files, timeout=self.timeout)
@@ -141,11 +151,11 @@ class ImageToolkit():
             if parent:
                 parent.out.clear()
                 parent.out.setText(str(e))
-            return
+            return None, None
         if parent:
             text = parent.out.toPlainText()
             text += f'{response}\n{response.headers}\n\n'
             text += f'{response.text}'
             parent.out.setText(text)
         jtext = json.loads(response.text)
-        return jtext["data"]["link"]
+        return jtext["data"]["link"], jtext["data"]["deletehash"]

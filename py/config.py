@@ -41,7 +41,8 @@ class Config():
                         "upload":
                             {
                             "clipboard_state": 0,
-                            "random_fname_state": 0
+                            "random_fname_state": 0,
+                            "last_service": "Imgur"
                             },
                         "shadows": 
                             {
@@ -56,6 +57,15 @@ class Config():
                                 "client_id": "25b4ba1ecc97502",
                                 "link": "https://api.imgur.com/3/image"
                             }
+                        },
+                    "colors":
+                        {
+                        "red": "#c7282e",
+                        "yellow": "#dbb126",
+                        "green": "#1dc129",
+                        "blue": "#3496dd",
+                        "white": "#FFFFFF",
+                        "black": "#000000"
                         }
                     }
                 file.write(str(json.dumps(self.parse, indent=4)))

@@ -8,6 +8,7 @@ import os
 
 from datetime import datetime
 from time import sleep
+import json
 
 class TabBar(QtWidgets.QTabBar):
     def tabSizeHint(self, index):
@@ -54,6 +55,89 @@ class ProxyStyle(QtWidgets.QProxyStyle):
             opt.rect = r
         QtWidgets.QProxyStyle.drawControl(self, element, opt, painter, widget)
 
+class HistoryItem(QtWidgets.QWidget):
+
+    def __init__ (self, parent):
+        super().__init__()
+
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+        self.del_hash = None
+
+        self.parent = parent
+        self.main_v = QVBoxLayout()
+        self.date = QLabel()
+        self.type = QLabel()
+
+        info_wrap = QHBoxLayout()
+        self.info = QLineEdit()
+        self.info_copy_open = QPushButton("Copy")
+        info_wrap.addWidget(self.info_copy_open, 20)
+        info_wrap.addWidget(self.info, 80)
+        self.info.setReadOnly(True)
+
+        self.main_v.addWidget(self.date)
+        self.main_v.addWidget(self.type)
+        self.main_v.addStretch(1)
+        self.main_v.addItem(info_wrap)
+        self.main_h_wrap = QHBoxLayout()
+
+        self.thumb = QLabel()
+
+        self.main_h_wrap.addLayout(self.main_v, 1)
+        self.main_h_wrap.addWidget(self.thumb, 0)
+
+        w = QFrame()
+        w.setFrameStyle(QFrame().StyledPanel | QFrame().Raised)
+        w.setLayout(self.main_h_wrap)
+        w.setFixedHeight(110)
+        framewrap = QVBoxLayout()
+        framewrap.addWidget(w)
+        
+        self.setLayout(framewrap)
+
+    def show_context_menu(self, event):
+        qm = QtWidgets.QMenu()
+        act_0 = QtWidgets.QAction("Remove from history")
+        act_0.triggered.connect(lambda x: self.parent.remove_from_hist(self))
+        qm.addAction(act_0)
+
+        if 'Imgur' in self.type.text():
+            act_1 = QtWidgets.QAction("Remove from Imgur")
+            act_1.triggered.connect(self.open_imgur)
+            qm.addAction(act_1)
+        qm.exec(self.mapToGlobal(event))
+
+    def set_info_path(self):
+        self.info_copy_open.setText("Open")
+        self.info_copy_open.clicked.connect(self.open_dir)
+
+    def set_info_url(self):
+        self.info_copy_open.setText("Copy")
+        self.info_copy_open.clicked.connect(self.copy_url)
+
+    def open_imgur(self):
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(f"https://imgur.com/delete/{self.del_hash}"))
+
+    def open_dir(self, fpath=None):
+        if not fpath:
+            fpath = self.info.text()
+        os.popen(
+        f"""
+        dbus-send --session --print-reply \
+        --dest=org.freedesktop.FileManager1 \
+        --type=method_call /org/freedesktop/FileManager1 \
+        org.freedesktop.FileManager1.ShowItems \
+        array:string:"file://{fpath}" string:\"\"
+        """)
+
+    def copy_url(self):
+        self.parent.app.clipboard().setText(self.info.text())
+
+    def set_icon(self, imagePath):
+        self.thumb.setPixmap(QtGui.QPixmap(imagePath))
+
 class MainWindow(QtWidgets.QWidget):
 
     def __init__(self, parent, app, config, image_toolkit):
@@ -82,6 +166,11 @@ class MainWindow(QtWidgets.QWidget):
         self.file_filter = 'png'
         self.typed_dir_hint_list = []
 
+        _dirpath = os.path.dirname(os.path.realpath(__file__))
+        self.hist_dir = os.path.join(_dirpath, '../.history')
+        self.hist = os.path.join(self.hist_dir, 'index.json')
+        self.mime_db = QtCore.QMimeDatabase()
+
         self.initLayout()
     
     def initLayout(self):
@@ -89,16 +178,19 @@ class MainWindow(QtWidgets.QWidget):
         self.layout = QtWidgets.QVBoxLayout(self)
         self.tabs = TabWidget()
         
-        self.tab_capture, self.tab_upload, self.tab_settings, self.tab4 = [
+        self.tab_capture, self.tab_upload, \
+            self.tab_settings, self.tab_history = [
             QtWidgets.QWidget() for i in range(4)
         ]
-        
+
         self.tabs.addTab(self.tab_capture,"Capture")
         self.tabs.addTab(self.tab_upload,"Upload")
+        self.tabs.addTab(self.tab_history,"History")
         self.tabs.addTab(self.tab_settings,"Settings")
 
         self.initTabCapture()
         self.initTabUpload()
+        self.initTabHistory()
         self.initTabSettings()
         
         self.tabs.setCurrentIndex(1)
@@ -203,6 +295,12 @@ class MainWindow(QtWidgets.QWidget):
         self.up_comb.addItem("Imgur")
         self.up_comb.addItem("catbox.moe")
         self.up_comb.addItem("uguu.se")
+        last_item = self.config.parse['config']['upload']['last_service']
+        if last_item == 'catbox.moe':
+            self.up_comb.setCurrentIndex(1)
+        elif last_item == 'uguu.se':
+            self.up_comb.setCurrentIndex(2)
+        self.up_comb.currentIndexChanged.connect(self.update_last_serv)
         up_hbox.addWidget(up_lab)
         up_hbox.addWidget(self.up_comb)
         in_hb_right.addItem(up_hbox)
@@ -253,6 +351,67 @@ class MainWindow(QtWidgets.QWidget):
         main_v.addWidget(inner_q_down, 70)
         self.tab_upload.setLayout(main_v)
 
+    def initTabHistory(self):
+        main_wrap = QVBoxLayout()
+
+        data = ''
+        if not os.path.isdir(self.hist_dir):
+            os.mkdir(self.hist_dir)
+
+        if os.path.isfile(self.hist):
+            with open(self.hist, 'r') as file:
+                data = file.read()
+        else:
+            with open(self.hist, 'w') as file:
+                pass
+
+        self.history_list = QtWidgets.QListWidget(self)
+        self.history_list.setSortingEnabled(True)
+        if not data:
+            main_wrap.addWidget(self.history_list)
+            clear_btn = QPushButton("Clear")
+            clear_btn.clicked.connect(self.clear_history_list)
+            main_wrap.addWidget(clear_btn)
+            self.tab_history.setLayout(main_wrap)
+            return
+
+        data = json.loads(data)
+
+        for item in data.keys():
+            date = item
+            type_ = data[item]['Type']
+            path = data[item]['Path']
+            url = data[item]['URL']
+            icon = data[item]['Thumb']
+
+            hitem = HistoryItem(self)
+
+            if 'del_hash' in data[item]:
+                hitem.del_hash = data[item]['del_hash']
+            hitem.date.setText(date)
+            hitem.type.setText(type_)
+            if url:
+                hitem.info.setText(url)
+                hitem.set_info_url()
+            else:
+                hitem.info.setText(path)
+                hitem.set_info_path()
+            hitem.set_icon(icon)
+
+            widget = QtWidgets.QListWidgetItem()
+
+            widget.setSizeHint(hitem.sizeHint())
+
+            self.history_list.addItem(widget)
+            self.history_list.setItemWidget(widget, hitem)
+
+        clear_btn = QPushButton("Clear")
+        clear_btn.clicked.connect(self.clear_history_list)
+        main_wrap.addWidget(self.history_list)
+        main_wrap.addWidget(clear_btn)
+        self.history_list.sortItems(Qt.DescendingOrder)
+        self.tab_history.setLayout(main_wrap)
+
     def initTabSettings(self):
         main_wrap = QVBoxLayout()
 
@@ -263,30 +422,35 @@ class MainWindow(QtWidgets.QWidget):
         self.dirline.setReadOnly(True)
         self.dirbtn = QPushButton("Browse")
         self.dirbtn.clicked.connect(self.browse_directories)
+
         up_dir.addWidget(dir_lab)
         up_dir.addWidget(self.dirline)
         up_dir.addWidget(self.dirbtn)
 
-        bot_left_fr = QFrame()
-        bot_left_fr.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
-        bot_left = QVBoxLayout()
-        bot_left_0 = QHBoxLayout()
+        general_frame = QFrame()
+        general_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
+
+        general_wrap = QVBoxLayout()
+
+        delay_wrap = QHBoxLayout()
         self.del_check = QtWidgets.QDoubleSpinBox()
         self.del_check.setSingleStep(0.05)
         self.del_check.setDecimals(2)
         del_lab = QLabel("Default delay (seconds): ")
         self.del_check.setValue(self.config.parse['config']['default_delay'])
         self.del_check.valueChanged.connect(self.update_delay)
-        bot_left_0.addWidget(del_lab)
-        bot_left_0.addWidget(self.del_check)
-        bot_left_1 = QHBoxLayout()
+        delay_wrap.addWidget(del_lab)
+        delay_wrap.addWidget(self.del_check)
+
+        name_wrap = QHBoxLayout()
         fmt_lab = QLabel("Name pattern: ")
-        self.fmt_ql = QLineEdit()
-        self.fmt_ql.setText(self.config.parse['config']['filename_format'])
-        self.fmt_ql.textChanged.connect(self.update_file_format)
-        bot_left_1.addWidget(fmt_lab)
-        bot_left_1.addWidget(self.fmt_ql)
-        bot_left_2 = QHBoxLayout()
+        self.name_pattern = QLineEdit()
+        self.name_pattern.setText(self.config.parse['config']['filename_format'])
+        self.name_pattern.textChanged.connect(self.update_file_format)
+        name_wrap.addWidget(fmt_lab)
+        name_wrap.addWidget(self.name_pattern)
+
+        icon_wrap = QHBoxLayout()
         ico_lab = QLabel("Tray icon style: ")
         self.ico_comb = QComboBox()
         self.ico_comb.addItem("Colored")
@@ -298,19 +462,20 @@ class MainWindow(QtWidgets.QWidget):
         elif curr_ico == 'black':
             self.ico_comb.setCurrentIndex(2)
         self.ico_comb.currentIndexChanged.connect(self.update_ico)
-        bot_left_2.addWidget(ico_lab)
-        bot_left_2.addWidget(self.ico_comb)
-        bot_left.addItem(up_dir)
-        bot_left.addItem(bot_left_1)
-        bot_left.addItem(bot_left_0)
-        bot_left.addItem(bot_left_2)
-        bot_left_fr.setLayout(bot_left)
+        icon_wrap.addWidget(ico_lab)
+        icon_wrap.addWidget(self.ico_comb)
 
-        bot_right_fr = QFrame()
-        bot_right = QVBoxLayout()
-        bot_right_fr.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
+        general_wrap.addItem(up_dir)
+        general_wrap.addItem(name_wrap)
+        general_wrap.addItem(delay_wrap)
+        general_wrap.addItem(icon_wrap)
+        general_frame.setLayout(general_wrap)
 
-        bot_right_0 = QHBoxLayout()
+        canvas_frame = QFrame()
+        canvas_wrap = QVBoxLayout()
+        canvas_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
+
+        upload_wrap = QHBoxLayout()
         up_lab = QLabel("Upload button service: ")
         self.set_up_comb = QComboBox()
         self.set_up_comb.addItem("Imgur")
@@ -322,9 +487,10 @@ class MainWindow(QtWidgets.QWidget):
         elif curr_serv == 'uguu.se':
             self.set_up_comb.setCurrentIndex(2)
         self.set_up_comb.currentIndexChanged.connect(self.update_canvas_upload)
-        bot_right_0.addWidget(up_lab)
-        bot_right_0.addWidget(self.set_up_comb)
-        bot_right_1 = QHBoxLayout()
+        upload_wrap.addWidget(up_lab)
+        upload_wrap.addWidget(self.set_up_comb)
+
+        save_btn_wrap = QHBoxLayout()
         save_lab = QLabel("Save button: ")
         self.set_save = QComboBox()
         self.set_save.addItem("Saves to default directory")
@@ -332,20 +498,21 @@ class MainWindow(QtWidgets.QWidget):
         if self.config.parse['config']['canvas']['save_action'] == 'dialog':
             self.set_save.setCurrentIndex(1)
         self.set_save.currentIndexChanged.connect(self.update_canvas_save)
-        bot_right_1.addWidget(save_lab)
-        bot_right_1.addWidget(self.set_save)
-        bot_right_2 = QHBoxLayout()
+        save_btn_wrap.addWidget(save_lab)
+        save_btn_wrap.addWidget(self.set_save)
+
+        copy_img_wrap = QHBoxLayout()
         img_clip_lab = QLabel("Copy image to clipboard on save")
         self.img_check = QCheckBox()
         self.img_check.setChecked(bool(self.config.parse['config']['canvas']['img_clip']))
         self.img_check.stateChanged.connect(self.update_img_clip)
-        bot_right_2.addWidget(self.img_check)
-        bot_right_2.addWidget(img_clip_lab)
-        bot_right_2.addStretch(1)
-        bot_right.addItem(bot_right_0)
-        bot_right.addItem(bot_right_1)
-        bot_right.addItem(bot_right_2)
-        bot_right_fr.setLayout(bot_right)
+        copy_img_wrap.addWidget(self.img_check)
+        copy_img_wrap.addWidget(img_clip_lab)
+        copy_img_wrap.addStretch(1)
+        canvas_wrap.addItem(upload_wrap)
+        canvas_wrap.addItem(save_btn_wrap)
+        canvas_wrap.addItem(copy_img_wrap)
+        canvas_frame.setLayout(canvas_wrap)
 
         bot_wrap = QVBoxLayout()
         lab_0 = QLabel(" General")
@@ -353,18 +520,18 @@ class MainWindow(QtWidgets.QWidget):
         lab_0.setFixedHeight(30)
         lab_1.setFixedHeight(30)
         bot_wrap.addWidget(lab_0)
-        bot_wrap.addWidget(bot_left_fr)
+        bot_wrap.addWidget(general_frame)
         bot_wrap.addStretch(1)
         bot_wrap.addWidget(lab_1)
-        bot_wrap.addWidget(bot_right_fr)
+        bot_wrap.addWidget(canvas_frame)
         
         main_wrap.addItem(bot_wrap)
 
-        qw = QFrame()
-        qw.setLayout(main_wrap)
+        scroll_frame = QFrame()
+        scroll_frame.setLayout(main_wrap)
         scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setWidget(qw)
+        scroll.setWidget(scroll_frame)
 
         scroll_wrap = QVBoxLayout()
         scroll_wrap.addWidget(scroll)
@@ -377,6 +544,8 @@ class MainWindow(QtWidgets.QWidget):
 
     def file_upload(self):
         get_file = self.ql_f.currentText().strip()
+        if get_file.startswith('file://'):
+            get_file = get_file.replace('file://', '')
         if not os.path.isfile(get_file):
             if get_file:
                 self.out.setText(f"File not found: {get_file}")
@@ -385,33 +554,123 @@ class MainWindow(QtWidgets.QWidget):
         self.out.clear()
         self.result_f.clear()
 
+        args = [self.config, get_file, self.name_check.isChecked(), self]
+
         if self.up_comb.currentText() == 'Imgur':
-            response_json = self.image_toolkit.imgur_upload(self.config,
-                                                            get_file,
-                                                            randname=self.name_check.isChecked(),
-                                                            parent=self)
+            response_json, del_hash = self.image_toolkit.imgur_upload(*args)
             if response_json:
                 self.result_f.setText(response_json)
+
+                self.push_to_history(get_file, response_json, self.up_comb.currentText(), del_hash)
                 if self.copy_check.isChecked():
                     self.copy_to_clipboard()
+            return
         elif self.up_comb.currentText() == 'catbox.moe':
-            response = self.image_toolkit.catbox_upload(self.config,
-                                                        get_file,
-                                                        randname=self.name_check.isChecked(),
-                                                        parent=self)
-            if response:
-                self.result_f.setText(response)
-                if self.copy_check.isChecked():
-                    self.copy_to_clipboard()
+            response = self.image_toolkit.catbox_upload(*args)
         else:
-            response = self.image_toolkit.uguu_upload(self.config,
-                                                      get_file,
-                                                      randname=self.name_check.isChecked(),
-                                                      parent=self)
-            if response:
-                self.result_f.setText(response)
-                if self.copy_check.isChecked():
-                    self.copy_to_clipboard()
+            response = self.image_toolkit.uguu_upload(*args)
+        if response:
+            self.result_f.setText(response)
+
+            self.push_to_history(get_file, response, self.up_comb.currentText())
+            if self.copy_check.isChecked():
+                self.copy_to_clipboard()
+
+    def push_to_history(self, get_file, response, type_, delete_hash=None):
+        curr_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        filetype = self.mime_db.mimeTypeForFile(get_file)
+        if not 'image' in filetype.iconName():
+            thumb = QtGui.QIcon.fromTheme(filetype.iconName())
+            thumb = thumb.pixmap(thumb.actualSize(QtCore.QSize(100, 100)))
+        else:
+            thumb = QtGui.QImage(get_file)
+            thumb = thumb.scaled(100, 100, Qt.KeepAspectRatioByExpanding,
+                                        Qt.SmoothTransformation)
+            if thumb.width() > 100:
+                rect = QtCore.QRect( 
+                    (thumb.width() - 100) / 2, 
+                    (thumb.height() - 100) / 2, 
+                    100, 
+                    100, 
+                )
+                thumb = thumb.copy(rect)
+
+        data = {}
+        if not os.path.isfile(self.hist):
+            with open(self.hist, 'w') as file:
+                pass
+        else:
+            with open(self.hist, 'r') as file:
+                fdata = file.read()
+                if fdata:
+                    data = json.loads(fdata)
+
+        if curr_date in data:
+            from time import time_ns
+            curr_date += ('-'+str(time_ns()))
+
+        thumb_name = os.path.join(self.hist_dir, curr_date+'.png')
+        thumb.save(thumb_name)
+
+        data[curr_date] = {
+                            "Type":"Upload — "+type_,
+                            "URL":response,
+                            "Path":get_file,
+                            "Thumb":thumb_name
+                            }
+        if delete_hash:
+            data[curr_date]['del_hash'] = delete_hash
+
+        with open(self.hist, 'w') as file:
+            file.write(str(json.dumps(data)))
+
+        item = HistoryItem(self)
+        if delete_hash:
+            item.del_hash = delete_hash
+        item.date.setText(curr_date)
+        item.type.setText("Upload — "+type_)
+        item.info.setText(response)
+        item.set_info_url()
+
+        item.set_icon(thumb_name)
+
+        widget = QtWidgets.QListWidgetItem()
+
+        widget.setSizeHint(item.sizeHint())
+
+        self.history_list.insertItem(0, widget)
+        self.history_list.setItemWidget(widget, item)
+
+    def remove_from_hist(self, item):
+        with open(self.hist, 'r') as file:
+            fdata = file.read()
+            if not fdata:
+                return
+        fdata = json.loads(fdata)
+
+        thumb = fdata[item.date.text()]['Thumb']
+        os.remove(thumb)
+        del fdata[item.date.text()]
+
+        if self.history_list.count() > 1:
+            for i in range(0, self.history_list.count()):
+                h_item = self.history_list.item(i)
+                w_item = self.history_list.itemWidget(h_item)
+                if w_item == item:
+                    self.history_list.takeItem(i)
+        else:
+            self.history_list.takeItem(0)
+        with open(self.hist, 'w') as file:
+            file.write(str(json.dumps(fdata)))
+
+    def clear_history_list(self):
+        self.history_list.clear()
+        for file in os.listdir(self.hist_dir):
+            if file.endswith('.png'):
+                os.remove(os.path.join(self.hist_dir, file))
+        with open(self.hist, 'w') as file:
+            pass
 
     def browse_directories(self):
         filedialog = QtWidgets.QFileDialog()
@@ -496,11 +755,14 @@ class MainWindow(QtWidgets.QWidget):
         else:
             self.config.changeConfig('upload', 'random_fname_state', 0)
 
+    def update_last_serv(self):
+        self.config.changeConfig('upload', 'last_service', self.up_comb.currentText())
+
     def update_delay(self):
         self.config.changeConfig('default_delay', value=self.del_check.value())
 
     def update_file_format(self):
-        new_format = self.fmt_ql.text()
+        new_format = self.name_pattern.text()
         self.config.changeConfig('filename_format', value=new_format)
 
     def update_canvas_upload(self):

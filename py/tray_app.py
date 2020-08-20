@@ -74,15 +74,15 @@ class Tray(QtWidgets.QWidget):
                             | QtCore.Qt.X11BypassWindowManagerHint)
         self.trigger.connect(self.initCapture)
         self.initTray()
-        self.initCapture()
-        #self.initScreen()
+        #self.initCapture()
+        self.initScreen()
 
     def initCapture(self):
         try:
             del self.window
         except AttributeError:
             pass
-        self.window = ScreenWindow(self.app, self.config, self.img_toolkit)
+        self.window = ScreenWindow(self, self.app, self.config, self.img_toolkit)
         self.window.show()
 
     def initScreen(self):

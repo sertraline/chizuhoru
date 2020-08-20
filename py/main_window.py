@@ -684,12 +684,12 @@ class MainWindow(QtWidgets.QWidget):
 
     def call_file_dialog(self):
         qdialog_filter = ('All files (*.*)'
-                             ';;Pictures (*.png *.jpg *.jpeg *.bmp *.ico *.tiff)'
+                             ';;Pictures (*.png *.jpg *.jpeg *.bmp *.gif *.ico *.tiff)'
                              ';;Videos (*.mp4 *.webm *.mkv *.mov)'
                              ';;Text (*.txt)'
                           )
         if self.up_comb.currentData(self.up_comb.currentIndex()) == 'Imgur':
-            qdialog_filter = 'Pictures (*.png *.jpg *.jpeg *.bmp *.ico *.tiff)'
+            qdialog_filter = 'Pictures (*.png *.jpg *.jpeg *.bmp *.gif *.ico *.tiff)'
         fd = QtWidgets.QFileDialog().getOpenFileName(self, 'Select file',
                                                      '', qdialog_filter)
 

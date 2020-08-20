@@ -572,10 +572,16 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             thumb = thumb.copy(rect)
 
         data = {}
-        with open(self.hist, 'r') as file:
-            fdata = file.read()
-            if fdata:
-                data = json.loads(fdata)
+        if not os.path.isdir(self.hist_dir):
+            os.mkdir(self.hist_dir)
+        if not os.path.isfile(self.hist):
+            with open(self.hist, 'w') as file:
+                pass
+        else:
+            with open(self.hist, 'r') as file:
+                fdata = file.read()
+                if fdata:
+                    data = json.loads(fdata)
 
         if curr_date in data:
             from time import time_ns

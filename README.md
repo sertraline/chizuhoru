@@ -2,6 +2,13 @@
 
 ![Paint preview](https://i.imgur.com/FM00k78.png)  
 
+## Features
+- Editor: painting, shapes, cropping
+- Standalone uploader: imgur, catbox, uguu
+- Screenshot uploads
+- History
+  - Imgur links are stored with delete hash. Delete hash allows you to remove image from Imgur. You can access it through context menu on any Imgur item.
+
 ### Easy install  
 
 ```
@@ -59,3 +66,4 @@ Where `PATH` must be replaced with actual path to this directory.
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd>                         | Undo                                  |
   
 
+![Usage preview](https://i.imgur.com/wiNqjTf.gif)

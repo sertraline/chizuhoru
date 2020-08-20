@@ -74,8 +74,8 @@ class Tray(QtWidgets.QWidget):
                             | QtCore.Qt.X11BypassWindowManagerHint)
         self.trigger.connect(self.initCapture)
         self.initTray()
-        #self.initCapture()
-        self.initScreen()
+        self.initCapture()
+        #self.initScreen()
 
     def initCapture(self):
         try:

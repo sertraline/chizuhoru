@@ -6,11 +6,11 @@ import os
 
 class ChzInit():
 
-    def __init__(self, app, config):
+    def __init__(self, app, config, fallback=False):
         self.config = config
         self.app = app
         self.check_pid()
-        self.init_app()
+        self.init_app(fallback)
     
     def check_pid(self):
         pid = str(os.getpid())
@@ -36,8 +36,8 @@ class ChzInit():
             print(f"Error writing to '{self.pidfile}': {e}")
             sys.exit(1)
 
-    def init_app(self):
-        tray_inst = Tray(self.app, self.config)
+    def init_app(self, fallback):
+        tray_inst = Tray(self.app, self.config, fallback)
         tray_inst.show()
 
         self.app.aboutToQuit.connect(self.app.deleteLater)

@@ -8,6 +8,7 @@ from datetime import datetime
 from os.path import join
 
 from PyQt5 import QtWidgets
+from PyQt5 import Qt, QtGui
 import setproctitle
 import sys
 
@@ -33,6 +34,32 @@ if __name__ == '__main__':
                                 save_changes=False)
     
     app = QtWidgets.QApplication(sys.argv)
+    styles = QtWidgets.QStyleFactory.keys()
+    fallback = False
+    # Qt5CTProxyStyle
+    if not app.style().metaObject().className() == 'Breeze::Style':
+        # If breeze is not available, use Fusion as fallback
+        app.setStyle(QtWidgets.QStyleFactory.create('Fusion'))
+        _app_palette = Qt.QPalette()
+        _app_palette.setColor(Qt.QPalette.Window, Qt.QColor(53,53,53))
+        _app_palette.setColor(Qt.QPalette.WindowText, Qt.QColor('white'))
+        _app_palette.setColor(Qt.QPalette.Base, Qt.QColor(25,25,25))
+        _app_palette.setColor(Qt.QPalette.AlternateBase, Qt.QColor(53,53,53))
+        _app_palette.setColor(Qt.QPalette.ToolTipBase, Qt.QColor('white'))
+        _app_palette.setColor(Qt.QPalette.ToolTipText, Qt.QColor('white'))
+        _app_palette.setColor(Qt.QPalette.Text, Qt.QColor('white'))
+        _app_palette.setColor(Qt.QPalette.Button, Qt.QColor(53,53,53))
+        _app_palette.setColor(Qt.QPalette.ButtonText, Qt.QColor('white'))
+        _app_palette.setColor(Qt.QPalette.BrightText, Qt.QColor('red'))
+        _app_palette.setColor(Qt.QPalette.Link, Qt.QColor(42, 130, 218))
+        _font = QtGui.QFont()
+        _font.setPointSize(10)
+        app.setFont(_font)
+
+        _app_palette.setColor(Qt.QPalette.Highlight, Qt.QColor(42, 130, 218))
+        app.setPalette(_app_palette)
+        fallback = True
+
     screen_unit = ScreenshotCLI()
 
     if args["screenshot"] == True:
@@ -46,4 +73,4 @@ if __name__ == '__main__':
         sys.exit()
     else:
         from chizuhoru import ChzInit
-        ChzInit(app, app_config)
+        ChzInit(app, app_config, fallback)

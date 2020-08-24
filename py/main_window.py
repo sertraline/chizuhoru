@@ -369,9 +369,6 @@ class MainWindow(QtWidgets.QWidget):
         self.history_list.setSortingEnabled(True)
         if not data:
             main_wrap.addWidget(self.history_list)
-            clear_btn = QPushButton("Clear")
-            clear_btn.clicked.connect(self.clear_history_list)
-            main_wrap.addWidget(clear_btn)
             self.tab_history.setLayout(main_wrap)
             return
 
@@ -402,14 +399,11 @@ class MainWindow(QtWidgets.QWidget):
 
             widget.setSizeHint(hitem.sizeHint())
 
-            self.history_list.addItem(widget)
+            self.history_list.insertItem(0, widget)
             self.history_list.setItemWidget(widget, hitem)
 
-        clear_btn = QPushButton("Clear")
-        clear_btn.clicked.connect(self.clear_history_list)
         main_wrap.addWidget(self.history_list)
-        main_wrap.addWidget(clear_btn)
-        self.history_list.sortItems(Qt.DescendingOrder)
+        #self.history_list.sortItems(Qt.DescendingOrder)
         self.tab_history.setLayout(main_wrap)
 
     def initTabSettings(self):
@@ -514,16 +508,29 @@ class MainWindow(QtWidgets.QWidget):
         canvas_wrap.addItem(copy_img_wrap)
         canvas_frame.setLayout(canvas_wrap)
 
+        history_frame = QFrame()
+        history_wrap = QHBoxLayout()
+        clear_btn = QPushButton("Clear history")
+        clear_btn.clicked.connect(self.clear_history_list)
+        history_wrap.addWidget(clear_btn)
+        history_frame.setLayout(history_wrap)
+        history_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
+
         bot_wrap = QVBoxLayout()
         lab_0 = QLabel(" General")
         lab_1 = QLabel(" Paint window")
+        lab_2 = QLabel(" History")
         lab_0.setFixedHeight(30)
         lab_1.setFixedHeight(30)
+        lab_2.setFixedHeight(30)
         bot_wrap.addWidget(lab_0)
         bot_wrap.addWidget(general_frame)
         bot_wrap.addStretch(1)
         bot_wrap.addWidget(lab_1)
         bot_wrap.addWidget(canvas_frame)
+        bot_wrap.addStretch(1)
+        bot_wrap.addWidget(lab_2)
+        bot_wrap.addWidget(history_frame)
         
         main_wrap.addItem(bot_wrap)
 

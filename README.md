@@ -1,13 +1,17 @@
 ## Chizuhoru - screenshot tool for Linux  
 
-![Paint preview](https://i.imgur.com/FM00k78.png)  
+![Paint preview](https://i.imgur.com/EfbQ6JT.png)  
 
 ## Features
-- Editor: painting, shapes, cropping
+- Editor: painting, shapes, cropping, blur
+- Magnifier
 - Standalone uploader: imgur, catbox, uguu
 - Screenshot uploads
 - History
   - Imgur links are stored with delete hash. Delete hash allows you to remove image from Imgur. You can access it through context menu on any Imgur item.
+
+### Can I see it in action?
+[demo](https://i.imgur.com/QR8wNb3.gif) (gif, 6MB)
 
 ### Easy install  
 
@@ -63,7 +67,5 @@ Where `PATH` must be replaced with actual path to this directory.
 | <kbd>Enter</kbd>                                       | Copy image or selection to clipboard  |
 | <kbd>S</kbd>                                           | Save image or selection               |
 | <kbd>A</kbd>                                           | Select window under the mouse pointer |
+| <kbd>Z</kbd>                                           | Toggle magnifier                      |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd>                         | Undo                                  |
-  
-
-![Usage preview](https://i.imgur.com/wiNqjTf.gif)

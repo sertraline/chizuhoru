@@ -45,10 +45,11 @@ class SignalWakeupHandler(QtNetwork.QAbstractSocket):
 class Tray(QtWidgets.QWidget):
     trigger = QtCore.pyqtSignal()
     
-    def __init__(self, app, app_config):
+    def __init__(self, app, app_config, fallback):
         super().__init__()
         self.app = app
         self.config = app_config
+        self.fallback = fallback
         self.window = None
         self.main_window = None
 
@@ -82,7 +83,8 @@ class Tray(QtWidgets.QWidget):
             del self.window
         except AttributeError:
             pass
-        self.window = ScreenWindow(self, self.app, self.config, self.img_toolkit)
+        self.window = ScreenWindow(self, self.app, self.config,
+                                   self.img_toolkit, self.fallback)
         self.window.show()
 
     def initScreen(self):
@@ -143,4 +145,3 @@ class Tray(QtWidgets.QWidget):
             print("Dialog already exists")
         else:
             self.initScreen()
-

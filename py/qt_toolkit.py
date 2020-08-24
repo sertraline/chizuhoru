@@ -53,7 +53,7 @@ class BaseLayerCanvas(QtWidgets.QLabel):
 
         self.setGeometry(0, 0, self.width, self.height)
         self.rectx, self.recty, self.rectw, self.recth = [0 for i in range(4)]
-        self.setCursor(QtGui.QCursor(QtGui.QCursor(QtCore.Qt.CrossCursor)))
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
 
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
                             | QtCore.Qt.FramelessWindowHint \
@@ -82,13 +82,14 @@ class ToolsConfigOutline(QtWidgets.QDialog):
 
         self.setWindowOpacity(0.4)
         widget_width, widget_height = 404, 306
-        self.setGeometry(self.parent.pos().x() - 50,
-                         self.parent.pos().y() - 122,
+        self.setFixedSize(widget_width, widget_height)
+        self.setGeometry((self.width/2) - (widget_width/2),
+                         self.parent.pos().y() - 124,
                          widget_width, widget_height)
 
     def resizeEvent(self, event):
         balloon_h = 20
-        balloon_w  = 25
+        balloon_w  = 30
         wndRect = self.rect()
         self.wndRect = wndRect
         # https://github.com/sharkpp/qtpopover
@@ -100,10 +101,10 @@ class ToolsConfigOutline(QtWidgets.QDialog):
             QPoint(wndRect.x() + wndRect.width(), wndRect.height() - balloon_h),
 
             QPoint(wndRect.x() + wndRect.width(), wndRect.height() - balloon_h),
-            QPoint(wndRect.x() + wndRect.width() / 2, wndRect.height() - balloon_h),
+            QPoint(wndRect.x() + wndRect.width() / 2 - balloon_w / 2, wndRect.height() - balloon_h),
 
-            QPoint(wndRect.x() + wndRect.width() / 2 - balloon_w / 2, wndRect.height()),
-            QPoint(wndRect.x() + wndRect.width() / 2 - balloon_w, wndRect.height() - balloon_h),
+            QPoint(wndRect.x() + wndRect.width() / 2, wndRect.height()),
+            QPoint(wndRect.x() + wndRect.width() / 2 + balloon_w / 2, wndRect.height() - balloon_h),
 
             QPoint(wndRect.x(), wndRect.height() - balloon_h)
         )
@@ -130,8 +131,9 @@ class ToolsConfig(QtWidgets.QDialog):
                             | QtCore.Qt.X11BypassWindowManagerHint)
 
         widget_width, widget_height = 400, 300
-        self.setGeometry(self.parent.pos().x() - 48,
-                         self.parent.pos().y() - 120,
+        self.setFixedSize(widget_width, widget_height)
+        self.setGeometry((self.width/2) - (widget_width/2),
+                         self.parent.pos().y() - 122,
                          widget_width, widget_height)
 
         _palette = self.parent.config.parse['colors']
@@ -462,7 +464,7 @@ class ToolsConfig(QtWidgets.QDialog):
 
     def resizeEvent(self, event):
         balloon_h = 20
-        balloon_w = 25
+        balloon_w = 30
         wndRect = self.rect()
         self.wndRect = wndRect
         poly_cords = (
@@ -473,10 +475,10 @@ class ToolsConfig(QtWidgets.QDialog):
             QPoint(wndRect.x() + wndRect.width(), wndRect.height() - balloon_h),
 
             QPoint(wndRect.x() + wndRect.width(), wndRect.height() - balloon_h),
-            QPoint(wndRect.x() + wndRect.width() / 2, wndRect.height() - balloon_h),
+            QPoint(wndRect.x() + wndRect.width() / 2 - balloon_w / 2, wndRect.height() - balloon_h),
 
-            QPoint(wndRect.x() + wndRect.width() / 2 - balloon_w / 2, wndRect.height()),
-            QPoint(wndRect.x() + wndRect.width() / 2 - balloon_w, wndRect.height() - balloon_h),
+            QPoint(wndRect.x() + wndRect.width() / 2, wndRect.height()),
+            QPoint(wndRect.x() + wndRect.width() / 2 + balloon_w / 2, wndRect.height() - balloon_h),
 
             QPoint(wndRect.x(), wndRect.height() - balloon_h)
         )
@@ -523,9 +525,8 @@ class ToolsConfig(QtWidgets.QDialog):
                 submit(key)
                 return
 
-
 class Toolkit(BaseLayer):
-    def __init__(self, parent, config):
+    def __init__(self, parent, config, fallback):
         super().__init__()
         self.config = config
         self.parent = parent
@@ -533,13 +534,15 @@ class Toolkit(BaseLayer):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
 
-        widget_width, widget_height = 280, 300
-        self.setGeometry((self.left + (self.width / 2 - 150)),
-                         (self.top + (self.height - 300)),
+        widget_width, widget_height = 400, 240
+        self.setFixedSize(widget_width, widget_height)
+        self.setGeometry((self.width - widget_width) / 2,
+                         self.height - widget_height,
                          widget_width, widget_height)
 
         self.switch = 0
-        self.switches = [['free', 5], ['line', 4],
+        self.switches = [['blur', 6], 
+                         ['free', 5], ['line', 4],
                          ['rect', 3], ['circle', 2],
                          ['pen', 1], ['sel', 0]]
 
@@ -607,7 +610,7 @@ class Toolkit(BaseLayer):
         grid = QGridLayout(self)
 
         _tools = ['sel', 'rect', 'line', 'pen',
-                  'circle', 'free', 'color', 
+                  'circle', 'free', 'color', 'blur',
                   'close', 'save', 'upload']
 
         self.tools = {x:QPushButton() for x in _tools}
@@ -632,6 +635,8 @@ class Toolkit(BaseLayer):
         }
         """)
 
+        self.btn_css_32 = self.btn_css.replace('64px', '32px')
+
         grid.setHorizontalSpacing(4)
         grid.setVerticalSpacing(8)
         self.setLayout(grid)
@@ -643,25 +648,44 @@ class Toolkit(BaseLayer):
         vspace = QSpacerItem(0, 0, QSizePolicy.Minimum,
                                    QSizePolicy.Expanding)
  
-        grid.addWidget(self.tools['save'], 0, 0)
-        grid.addWidget(self.tools['upload'], 0, 1)
-        grid.addWidget(self.tools['close'], 0, 2)
-        grid.addWidget(self.tools['sel'], 1, 1)
-        grid.addWidget(self.tools['pen'], 2, 0)
-        grid.addWidget(self.tools['color'], 2, 1)
-        grid.addWidget(self.tools['free'], 2, 2)
-        grid.addWidget(self.tools['rect'], 3, 0)
-        grid.addWidget(self.tools['circle'], 3, 1)
-        grid.addWidget(self.tools['line'], 3, 2)
+        left_grid = QGridLayout()
+        left_grid.addWidget(self.tools['rect'], 0, 0)
+        left_grid.addWidget(self.tools['circle'], 1, 0)
+        left_grid_frame = QFrame()
+        left_grid_frame.setStyleSheet('QPushButton { width: 32px }')
+        left_grid_frame.setLayout(left_grid)
+
+        right_grid = QGridLayout()
+        right_grid.addWidget(self.tools['line'], 0, 0)
+        right_grid.addWidget(self.tools['free'], 1, 0)
+        right_grid_frame = QFrame()
+        right_grid_frame.setStyleSheet('QPushButton { width: 32px }')
+        right_grid_frame.setLayout(right_grid)
+
+        grid.addWidget(self.tools['save'], 0, 1)
+        grid.addWidget(self.tools['upload'], 0, 2)
+        grid.addWidget(self.tools['close'], 0, 3)
+        grid.addWidget(self.tools['sel'], 1, 2)
+        grid.addWidget(self.tools['pen'], 1, 0)
+        grid.addWidget(self.tools['color'], 2, 2)
+        grid.addWidget(left_grid_frame, 1, 1, 2, 1)
+        grid.addWidget(right_grid_frame, 1, 3, 2, 1)
+        grid.addWidget(self.tools['blur'], 1, 4)
         grid.addItem(vspace, 4, 0, 1, -1)
 
     def get_css(self, key, active=False):
+        size_32 = ['rect', 'circle', 'line', 'free']
+
+        _css = self.btn_css
+        if key in size_32:
+            _css = self.btn_css_32
+
         if not active:
-            return self.btn_css % (sys.path[0], key,
-                                   sys.path[0], key+'_hover')
+            return _css % (sys.path[0], key,
+                           sys.path[0], key+'_hover')
         else:
-            return self.btn_css % (sys.path[0], key+'_hover',
-                                   sys.path[0], key+'_hover')
+            return _css % (sys.path[0], key+'_hover',
+                           sys.path[0], key+'_hover')
 
     def closeEvent(self, event):
         self.tools_config_outline.setWindowOpacity(0)

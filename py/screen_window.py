@@ -71,6 +71,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.img_toolkit = image_toolkit
         # define right-click control menu
         self.toolkit = qt_toolkit.Toolkit(self, self.config, fallback)
+        self.toolkit.setMouseTracking(True)
 
         self.showFullScreen()
         self.render_background()
@@ -96,7 +97,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         # RightMouseButton -> paint_allowed = False
         # LeftMouseButton  -> paint_allowed = True
-        self.paint_allowed = True
+        self.paint_allowed = False
         # last selection rectangle
         # LeftMouseButton -> self.sel_rect = None
         self.sel_rect = None
@@ -118,7 +119,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.pen_cords_track_list = []
 
         self.view.show()
-        _pen = QtGui.QPen(self.toolkit.pen_selection_color, 1, Qt.DashLine)
+        _pen = QtGui.QPen(QtGui.QColor(103, 150, 188, 180), 0.6, Qt.SolidLine)
         _brush = QtGui.QBrush(self.toolkit.brush_selection_color)
         self.scene_sel = self.scene.addRect(QtCore.QRectF(0, 0, 0, 0), _pen, _brush)
 
@@ -165,7 +166,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                         self.sel_rect = rect
             else:
                 # redraw last selection rectangle on RMB click
-                if self.sel_rect is not None and self.toolkit.switch == 0:
+                if self.sel_rect is not None:
                     painter.drawRect(self.sel_rect)
         else:
             painter.drawRect(self.cords)
@@ -192,13 +193,15 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if event.buttons() == QtCore.Qt.LeftButton:
             self.paint_allowed = True
             self.sel_rect = None
+            self.scene_sel.setRect(0, 0, 0, 0)
 
             if self.toolkit.switch == 5:
                 self.pen_point_list = []
             self.begin = event.pos()
             self.end = event.pos()
 
-            if (self.toolkit.switch == 0 or self.toolkit.switch == 6) and self.scene_sel:
+            cases = [0, 6, 4, 3]
+            if any(self.toolkit.switch == x for x in cases) and self.scene_sel:
                 self.scene_sel.setRect(self.begin.x(), self.begin.y(),
                                        self.end.x()-self.begin.x(),
                                        self.end.y()-self.begin.y())
@@ -223,11 +226,17 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if (event.y()+170 > self.height):
             ypos = event.y() - 170
 
-        self.view.move(xpos, ypos)
+        if self.toolkit.isVisible():
+            wstart = self.toolkit.pos().x()
+            ystart = self.toolkit.pos().y() - 35
+            wend = self.toolkit.pos().x() + self.toolkit.geometry().width()
+            yend = self.toolkit.pos().y() + self.toolkit.geometry().height()
+            if (event.y() >= ystart and event.y() <= yend) and \
+                (event.x() >= wstart-70 and event.x() <= wend+70):
+                ypos = ystart - 140
 
-        painter = QPainter(self.pixmap())
-        painter.setRenderHint(QPainter.HighQualityAntialiasing)
-        painter.setPen(QtGui.QPen(self.toolkit.pen_color, self.toolkit.pen_size))
+        self.view.move(xpos, ypos)
+        self.update()
 
         # switch 1: pen drawing, switch 5: free drawing
         if (self.toolkit.switch == 1 or self.toolkit.switch == 5) \
@@ -236,6 +245,11 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 self.last_x = event.x()
                 self.last_y = event.y()
                 return
+
+            painter = QPainter(self.pixmap())
+            painter.setRenderHint(QPainter.HighQualityAntialiasing)
+            painter.setPen(QtGui.QPen(self.toolkit.pen_color,
+                                      self.toolkit.pen_size))
 
             if abs(self.last_x - event.x()) > 4 or \
                 abs(self.last_y - event.y() > 4):
@@ -277,10 +291,11 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         elif event.buttons() == QtCore.Qt.LeftButton:
             self.end = event.pos()
 
-            if (self.toolkit.switch == 0 or self.toolkit.switch == 6) and self.scene_sel:
+            cases = [0, 6, 4, 3]
+            if any(self.toolkit.switch == x for x in cases) and self.scene_sel:
                 self.scene_sel.setRect(self.begin.x(), self.begin.y(),
-                                       self.end.x()-self.begin.x(),
-                                       self.end.y()-self.begin.y())
+                                       self.end.x()-self.begin.x()+0.4,
+                                       self.end.y()-self.begin.y()+0.4)
             self.update()
 
     def buildPath(self):
@@ -361,16 +376,20 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.end = event.pos()
         self.update()
 
-        if self.toolkit.switch == 0 and self.sel_rect:
+        if self.toolkit.switch == 0 and self.sel_rect \
+            and event.buttons() == QtCore.Qt.LeftButton:
             self.scene_sel.setRect(self.begin.x(), self.begin.y(),
                                     self.end.x()-self.begin.x(),
                                     self.end.y()-self.begin.y())
-            return
+            self.paint_allowed = False
         elif self.toolkit.switch == 0:
-            return
-        if self.begin == self.end:
-            return
+            self.paint_allowed = False
         if not self.paint_allowed:
+            return
+
+        self.paint_allowed = False
+
+        if self.begin == self.end:
             return
 
         if self.toolkit.switch == 6:
@@ -417,6 +436,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.begin = QtCore.QPoint()
             self.end = QtCore.QPoint()
             self.sel_rect = None
+            self.scene_sel.setRect(0, 0, 0, 0)
+            self.scene_px.setPixmap(self.pixmap())
             return
 
         painter = QPainter(self.pixmap())
@@ -462,6 +483,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.pen_cords_track_list = []
             self.begin = QtCore.QPoint()
             self.end = QtCore.QPoint()
+            self.scene_px.setPixmap(self.pixmap())
             self.update()
             return
         # draw on pixmap
@@ -496,6 +518,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         
         self.begin = QtCore.QPoint()
         self.end = QtCore.QPoint()
+        self.scene_px.setPixmap(self.pixmap())
         self.update()
 
     def wheelEvent(self, event):
@@ -594,20 +617,19 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                         painter.drawPixmap(*args)
 
             last_item = self.history.sequence[-1]
-            if last_item == 'p':
-                self.history.pen.pop(-1)
-            elif last_item == 'c':
-                self.history.circle.pop(-1)
-            elif last_item == 'r':
-                self.history.rect.pop(-1)
-            elif last_item == 'l':
-                self.history.line.pop(-1)
-            elif last_item == 'f':
-                self.history.free.pop(-1)
-            elif last_item == 'b':
-                self.history.blur.pop(-1)
+            items = [['p', self.history.pen],
+                     ['r', self.history.rect],
+                     ['l', self.history.line],
+                     ['f', self.history.free],
+                     ['b', self.history.blur],
+                     ['c', self.history.circle]]
+            for item in items:
+                if last_item == item[0]:
+                    item[1].pop(-1)
+
             self.history.sequence = self.history.sequence[:-1]
             painter.end()
+            self.scene_px.setPixmap(self.pixmap())
             return
 
         elif qKeyEvent.key() == QtCore.Qt.Key_Return:

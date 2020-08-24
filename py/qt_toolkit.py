@@ -604,6 +604,7 @@ class Toolkit(BaseLayer):
             for key in self.tools_config.colors.keys():
                 if _pen == self.tools_config.colors[key]:
                     self.tools_config.pen_sel(key)
+        self.masked = False
         self.initUI()
 
     def initUI(self):
@@ -703,6 +704,12 @@ class Toolkit(BaseLayer):
         self.show()
         self.setWindowOpacity(1)
         self.redefine_css()
+        if not self.masked:
+            pix = QtGui.QPixmap(400, 240)
+            pix.fill(QtGui.QColor('transparent'))
+            self.render(pix, QPoint(), QtGui.QRegion(QtCore.QRect(0, 0, 400, 240)))
+            self.setMask(pix.mask())
+            self.masked = True
 
     def mousePressEvent(self, event):
         if event.buttons() == QtCore.Qt.RightButton:

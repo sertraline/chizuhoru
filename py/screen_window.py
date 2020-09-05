@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import sys
 import os
+import gc
 
 import qt_toolkit
 from main_window import HistoryItem
@@ -78,6 +79,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         # make a screenshot
         self.temp = self.screen_unit.shot(self.screen)
         self.temp.seek(0)
+        self.pixel_data = None
 
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
                             | QtCore.Qt.FramelessWindowHint \
@@ -87,6 +89,17 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.scene = QtWidgets.QGraphicsScene()
         self.view = QtWidgets.QGraphicsView(self.scene, self)
         self.view.setStyleSheet("border: 6px solid rgba(0, 0, 0, 60);")
+        self.pixel_info = QtWidgets.QWidget(self)
+
+        self.pixel_info.setFixedSize(128, 24)
+        self.pixel_info_label = QtWidgets.QLabel()
+        _font = QtGui.QFont()
+        _font.setPointSize(8)
+        self.pixel_info_label.setFont(_font)
+        _l = QtWidgets.QHBoxLayout()
+        _l.addWidget(self.pixel_info_label)
+        self.pixel_info.setLayout(_l)
+
         self.cursor = None
         self.scene_px = None
 
@@ -114,6 +127,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         x.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations)
 
         self.view.move(self.width - 200, 40)
+        self.pixel_info.move(self.view.pos().x()+6, self.view.pos().y()+6)
+        self.pixel_info.setStyleSheet('background-color: rgba(0, 0, 0, 80);')
+        self.pixel_info_label.setStyleSheet('background-color: transparent; margin:0; padding:0;')
+        self.pixel_info.show()
         self.view.setSceneRect(0, 0, 140, 140)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -149,10 +166,11 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
     def render_background(self):
         qimg = QtGui.QPixmap()
         qimg.loadFromData(self.temp.getvalue())
-        scale = qimg.scaled(QSize(self.width, self.height))
-        self.setPixmap(scale)
+        self.setPixmap(qimg)
+        self.pixel_data = QImage()
+        self.pixel_data.loadFromData(self.temp.getvalue())
         if not self.scene_px:
-            self.scene_px = self.scene.addPixmap(scale)
+            self.scene_px = self.scene.addPixmap(qimg)
             self.view.scale(8, 8)
 
     def paintEvent(self, event):
@@ -211,6 +229,9 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
     def closeScreen(self):
         self.toolkit.close()
+        self.temp = None
+        self.pixel_data = QImage()
+        gc.collect()
         self.deleteLater()
         self.close()
   
@@ -255,6 +276,16 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.cursor.setPos((event.x()-8),
                            (event.y()-8))
 
+        try:
+            _px = self.pixel_data.pixel(event.x(), event.y())
+        except:
+            print(_px)
+        _px = QtGui.QColor(_px).getRgb()
+        _px = _px[:-1]
+        _info = '#{:02x}{:02x}{:02x}'.format(*_px)
+        _cords = f'{event.x()}, {event.y()}'
+        self.pixel_info_label.setText(f'{_info:<8} {_cords:>7}')
+
         xpos = event.x()-70
         ypos = event.y()+20
         if (event.x()-70 < 0):
@@ -274,6 +305,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 ypos = ystart - 200
 
         self.view.move(xpos, ypos)
+        self.pixel_info.move(self.view.pos().x()+6, self.view.pos().y()+6)
         self.update()
 
         # switch 1: pen drawing, switch 5: free drawing
@@ -525,6 +557,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.sel_rect = None
             self.scene_sel.setRect(0, 0, 0, 0)
             self.scene_px.setPixmap(self.pixmap())
+            self.pixel_data = self.pixmap().toImage()
             return
 
         painter = QPainter(self.pixmap())
@@ -554,6 +587,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.begin = QtCore.QPoint()
             self.end = QtCore.QPoint()
             self.scene_px.setPixmap(self.pixmap())
+            self.pixel_data = self.pixmap().toImage()
             self.update()
             return
         # draw on pixmap
@@ -589,6 +623,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.begin = QtCore.QPoint()
         self.end = QtCore.QPoint()
         self.scene_px.setPixmap(self.pixmap())
+        self.pixel_data = self.pixmap().toImage()
         self.update()
 
     def wheelEvent(self, event):
@@ -700,6 +735,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.history.sequence = self.history.sequence[:-1]
             painter.end()
             self.scene_px.setPixmap(self.pixmap())
+            self.pixel_data = self.pixmap().toImage()
             return
 
         elif qKeyEvent.key() == QtCore.Qt.Key_Return:
@@ -735,8 +771,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         
         elif qKeyEvent.nativeScanCode() == 52: #"Z"
             if self.view.isVisible():
+                self.pixel_info.hide()
                 self.view.hide()
             else:
+                self.pixel_info.show()
                 self.view.show()
         self.update()
 
@@ -830,6 +868,9 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             """ % (type_, response))
             os.popen(cmd)
         self.thread.quit()
+        self.temp = None
+        self.pixel_data = QImage()
+        gc.collect()
         self.deleteLater()
         self.close()
 

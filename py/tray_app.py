@@ -77,7 +77,7 @@ class Tray(QtWidgets.QWidget):
 
         SignalWakeupHandler(self.app, self)
         
-        signal.signal(signal.SIGCONT, lambda x,_: self.initCapture())
+        signal.signal(signal.SIGCONT, lambda x,_: self.initCaptureCheck())
 
         self.chz_ico = QtGui.QIcon(os.path.join(
                             sys.path[0], 'img', 'ico_colored.png')

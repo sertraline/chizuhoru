@@ -34,6 +34,68 @@ class Worker(QtCore.QObject):
             ret_val = self.fn(*self.args)
             self.finished.emit([self.args[1], ret_val, None])
 
+class Help(QtWidgets.QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.p = parent
+
+        self.setGeometry(0, 0, 400, 500)
+        self.setWindowTitle("Chizuhoru")
+        self.move(self.p.pos().x()+150, self.p.pos().y()-100)
+        self.initLayout()
+        self.setWindowTitle("Available patterns")
+        self.setWindowIcon(self.p.parent.chz_ico)
+        self.show()
+
+    def initLayout(self):
+        qv = QtWidgets.QVBoxLayout()
+
+        tips = {
+            "%Y": "Year with century (1980, 2020, ..., 9999)",
+            "%y": "Year shortened (80, 20, ..., 99)",
+            "%m": "Month as decimal (01, 02, ..., 12)",
+            "%B": "Month as full name (January, February)",
+            "%b": "Month abbreviated (Jan, Feb)",
+            "%H": "Hour (24-hour) (00, 15, 23)",
+            "%I": "Hour (12-hour) (00, 03, 12)",
+            "%M": "Minute (00, 30, ..., 59)",
+            "%S": "Second (00, 30, ..., 59)",
+            "%p": "AM/PM",
+            "%w": "Weekday as decimal (0, 1, ..., 6)",
+            "%A": "Weekday as full name (Sunday, Monday)",
+            "%a": "Weekday abbreviated (Sun, Mon)",
+            "%d": "Day of the month in decimal (01, 02, ..., 31)",
+            "%f": "Microsecond (000000, ..., 999999)",
+            "%Z": "Time zone name (UTC, EST, CST)",
+            "%j": "Day of the year (001, 100, ..., 366)",
+            "%U": "Week number from Sunday (00, 01, ..., 53)",
+            "%W": "Week number from Monday (00, 01, ..., 53)",
+            "%%": "A literal % character."
+        }
+
+        for key, val in tips.items():
+            _tx = QtWidgets.QLineEdit(key)
+            _tx.setReadOnly(True)
+            _tx.setFixedWidth(50)
+            _tx.selectAll()
+            _ds = QtWidgets.QLabel(val)
+            _wl = QtWidgets.QHBoxLayout()
+            _wl.addWidget(_tx)
+            space = QtWidgets.QSpacerItem(10, 0)
+            _wl.addItem(space)
+            _wl.addWidget(_ds)
+            qv.addItem(_wl)
+
+        scroll_frame = QFrame()
+        scroll_frame.setLayout(qv)
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(scroll_frame)
+
+        scroll_wrap = QVBoxLayout()
+        scroll_wrap.addWidget(scroll)
+        self.setLayout(scroll_wrap)
+
 class TabBar(QtWidgets.QTabBar):
     def tabSizeHint(self, index):
         s = QTabBar.tabSizeHint(self, index)
@@ -223,6 +285,9 @@ class MainWindow(QtWidgets.QWidget):
 
         self.layout.addWidget(self.tabs)
         self.was_hidden = False
+
+        # help window
+        self.helpw = None
         
         self.setLayout(self.layout)
 
@@ -465,10 +530,14 @@ class MainWindow(QtWidgets.QWidget):
         name_wrap = QHBoxLayout()
         fmt_lab = QLabel("Name pattern: ")
         self.name_pattern = QLineEdit()
+        self.name_pattern_help = QPushButton('?')
+        self.name_pattern_help.setFixedWidth(30)
+        self.name_pattern_help.clicked.connect(self.show_name_pattern_help_dialog)
         self.name_pattern.setText(self.config.parse['config']['filename_format'])
         self.name_pattern.textChanged.connect(self.update_file_format)
         name_wrap.addWidget(fmt_lab)
         name_wrap.addWidget(self.name_pattern)
+        name_wrap.addWidget(self.name_pattern_help)
 
         icon_wrap = QHBoxLayout()
         ico_lab = QLabel("Tray icon style: ")
@@ -581,6 +650,11 @@ class MainWindow(QtWidgets.QWidget):
         else:
             self.was_hidden = False
             self.close()
+
+    def show_name_pattern_help_dialog(self):
+        if not self.helpw:
+            self.helpw = Help(self)
+        self.helpw.show()
 
     def file_upload(self):
         if self.thread and self.thread.isRunning():

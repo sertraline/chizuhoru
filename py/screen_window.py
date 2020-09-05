@@ -754,6 +754,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if "-" in str(rectheight):
             recty = recty + rectheight
             rectheight = abs(rectheight)
+        rectwidth += 1
+        rectheight += 1
         image = image.copy(rectx, recty, (rectwidth), (rectheight))
         return image
 

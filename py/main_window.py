@@ -300,7 +300,6 @@ class MainWindow(QtWidgets.QWidget):
             self.move(self.height, self.width)
             self.setVisible(False)
             self.close()
-            sleep(self.parent.config.parse["config"]["default_delay"])
             self.parent.initCaptureCheck()
 
     def initTabCapture(self):

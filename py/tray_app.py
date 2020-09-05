@@ -77,7 +77,7 @@ class Tray(QtWidgets.QWidget):
 
         SignalWakeupHandler(self.app, self)
         
-        signal.signal(signal.SIGCONT, lambda x,_: self.initCaptureCheck())
+        signal.signal(signal.SIGCONT, lambda x,_: self.initCaptureCheck(False, 0))
 
         self.chz_ico = QtGui.QIcon(os.path.join(
                             sys.path[0], 'img', 'ico_colored.png')
@@ -99,26 +99,6 @@ class Tray(QtWidgets.QWidget):
         self.initTray()
         self.initCapture()
         #self.initScreen()
-
-    def initCapture(self):
-        try:
-            del self.window
-        except AttributeError:
-            pass
-        self.window = ScreenWindow(self, self.app, self.config,
-                                   self.img_toolkit, self.fallback)
-        self.window.show()
-
-    def initScreen(self):
-        try:
-            del self.main_window
-        except AttributeError:
-            pass
-        self.main_window = MainWindow(self, self.app, self.config, self.img_toolkit)
-        self.main_window.setWindowIcon(self.chz_ico)
-        self.main_window.show()
-        self.main_window.activateWindow()
-        self.main_window.raise_()
 
     def initTray(self):
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
@@ -194,3 +174,25 @@ class Tray(QtWidgets.QWidget):
             self.main_window.show()
         else:
             self.initScreen()
+
+    def initCapture(self):
+        try:
+            del self.window
+        except AttributeError:
+            pass
+        self.window = ScreenWindow(self, self.app, self.config,
+                                   self.img_toolkit, self.fallback)
+        self.window.show()
+        self.window.activateWindow()
+        self.window.raise_()
+
+    def initScreen(self):
+        try:
+            del self.main_window
+        except AttributeError:
+            pass
+        self.main_window = MainWindow(self, self.app, self.config, self.img_toolkit)
+        self.main_window.setWindowIcon(self.chz_ico)
+        self.main_window.show()
+        self.main_window.activateWindow()
+        self.main_window.raise_()

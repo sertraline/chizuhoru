@@ -276,10 +276,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.cursor.setPos((event.x()-8),
                            (event.y()-8))
 
-        try:
-            _px = self.pixel_data.pixel(event.x(), event.y())
-        except:
-            print(_px)
+        _px = self.pixel_data.pixel(event.x(), event.y())
         _px = QtGui.QColor(_px).getRgb()
         _px = _px[:-1]
         _info = '#{:02x}{:02x}{:02x}'.format(*_px)

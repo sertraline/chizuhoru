@@ -10,6 +10,30 @@ from datetime import datetime
 from time import sleep
 import json
 
+class Worker(QtCore.QObject):
+    finished = QtCore.pyqtSignal(list)
+    console = QtCore.pyqtSignal(list)
+
+    def __init__(self, fn, args, _type):
+        super(Worker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.type = _type
+
+    @QtCore.pyqtSlot()
+    def run(self):
+        self.args.append(self.console)
+        if self.type == 'Imgur':
+            try:
+                ret_val, del_hash = self.fn(*self.args)
+            except (ValueError, TypeError):
+                self.finished.emit([])
+                return
+            self.finished.emit([self.args[1], ret_val, del_hash])
+        else:
+            ret_val = self.fn(*self.args)
+            self.finished.emit([self.args[1], ret_val, None])
+
 class TabBar(QtWidgets.QTabBar):
     def tabSizeHint(self, index):
         s = QTabBar.tabSizeHint(self, index)
@@ -170,6 +194,7 @@ class MainWindow(QtWidgets.QWidget):
         self.hist_dir = os.path.join(_dirpath, '../.history')
         self.hist = os.path.join(self.hist_dir, 'index.json')
         self.mime_db = QtCore.QMimeDatabase()
+        self.thread = None
 
         self.initLayout()
     
@@ -197,6 +222,7 @@ class MainWindow(QtWidgets.QWidget):
         self.tabs.currentChanged.connect(self.capture_init)
 
         self.layout.addWidget(self.tabs)
+        self.was_hidden = False
         
         self.setLayout(self.layout)
 
@@ -471,15 +497,17 @@ class MainWindow(QtWidgets.QWidget):
 
         upload_wrap = QHBoxLayout()
         up_lab = QLabel("Upload button service: ")
+        box = ['Imgur', 'catbox.moe', 'uguu.se', 'Disabled']
         self.set_up_comb = QComboBox()
-        self.set_up_comb.addItem("Imgur")
-        self.set_up_comb.addItem("catbox.moe")
-        self.set_up_comb.addItem("uguu.se")
+        for item in box:
+            self.set_up_comb.addItem(item)
+
         curr_serv = self.config.parse['config']['canvas']['upload_service']
-        if curr_serv == 'catbox.moe':
-            self.set_up_comb.setCurrentIndex(1)
-        elif curr_serv == 'uguu.se':
-            self.set_up_comb.setCurrentIndex(2)
+        for count, item in enumerate(box):
+            if curr_serv == item:
+                self.set_up_comb.setCurrentIndex(count)
+                break
+
         self.set_up_comb.currentIndexChanged.connect(self.update_canvas_upload)
         upload_wrap.addWidget(up_lab)
         upload_wrap.addWidget(self.set_up_comb)
@@ -547,9 +575,17 @@ class MainWindow(QtWidgets.QWidget):
     def closeEvent(self, event):
         self.parent.last_out = self.out.toPlainText()
         self.parent.last_url = self.result_f.toPlainText()
-        self.close()
+        if self.thread and self.thread.isRunning():
+            self.was_hidden = True
+            self.hide()
+        else:
+            self.was_hidden = False
+            self.close()
 
     def file_upload(self):
+        if self.thread and self.thread.isRunning():
+            exit(1)
+
         get_file = self.ql_f.currentText().strip()
         if get_file.startswith('file://'):
             get_file = get_file.replace('file://', '')
@@ -561,27 +597,54 @@ class MainWindow(QtWidgets.QWidget):
         self.out.clear()
         self.result_f.clear()
 
-        args = [self.config, get_file, self.name_check.isChecked(), self]
+        args = [self.config, get_file, self.name_check.isChecked()]
 
         if self.up_comb.currentText() == 'Imgur':
-            response_json, del_hash = self.image_toolkit.imgur_upload(*args)
-            if response_json:
-                self.result_f.setText(response_json)
-
-                self.push_to_history(get_file, response_json, self.up_comb.currentText(), del_hash)
-                if self.copy_check.isChecked():
-                    self.copy_to_clipboard()
-            return
+            self.worker = Worker(self.image_toolkit.imgur_upload, args, 'Imgur')
         elif self.up_comb.currentText() == 'catbox.moe':
-            response = self.image_toolkit.catbox_upload(*args)
+            self.worker = Worker(self.image_toolkit.catbox_upload, args, 'catbox.moe')
         else:
-            response = self.image_toolkit.uguu_upload(*args)
-        if response:
-            self.result_f.setText(response)
+            self.worker = Worker(self.image_toolkit.uguu_upload, args, 'uguu.se')
 
-            self.push_to_history(get_file, response, self.up_comb.currentText())
+        self.thread = QtCore.QThread()
+        self.worker.console.connect(self.set_console_text)
+        self.worker.finished.connect(self.get_ret_val)
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(self.worker.run)
+        self.thread.start()
+        self.up_btn.setStyleSheet('background-color: #851313;')
+        self.up_btn.clearFocus()
+        self.up_btn.setText('Terminate')
+
+    def set_console_text(self, val):
+        if len(val) > 1:
+            self.out.clear()
+        val = val[0]
+        text = self.out.toPlainText()
+        time = datetime.now()
+        if len(val) == 1:
+            text += '\n'
+        text += f'[{time.hour:02d}:{time.minute:02d}:{time.second:02d}] {val}'
+        self.out.setText(text)
+        _cur = self.out.textCursor()
+        _cur.beginEditBlock()
+        _cur.movePosition(QtGui.QTextCursor().End)
+        _cur.endEditBlock()
+        self.out.verticalScrollBar().setSliderPosition(self.out.verticalScrollBar().maximum())
+
+    def get_ret_val(self, response):
+        if response:
+            self.result_f.setText(response[1])
+            filename = response[0]
+            del_hash = response[2]
+            response = response[1]
+            type_ = self.up_comb.currentText()
+            self.push_to_history(filename, response, type_, del_hash)
             if self.copy_check.isChecked():
                 self.copy_to_clipboard()
+        self.thread.quit()
+        self.up_btn.setText('Upload')
+        self.up_btn.setStyleSheet('')
 
     def push_to_history(self, get_file, response, type_, delete_hash=None):
         curr_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -617,7 +680,7 @@ class MainWindow(QtWidgets.QWidget):
             from time import time_ns
             curr_date += ('-'+str(time_ns()))
 
-        thumb_name = os.path.join(self.hist_dir, curr_date+'.png')
+        thumb_name = os.path.join(self.hist_dir, 'thumb_'+curr_date+'.png')
         thumb.save(thumb_name)
 
         data[curr_date] = {
@@ -674,7 +737,7 @@ class MainWindow(QtWidgets.QWidget):
     def clear_history_list(self):
         self.history_list.clear()
         for file in os.listdir(self.hist_dir):
-            if file.endswith('.png'):
+            if file.startswith('thumb_') and file.endswith('.png'):
                 os.remove(os.path.join(self.hist_dir, file))
         with open(self.hist, 'w') as file:
             pass

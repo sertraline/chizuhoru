@@ -612,7 +612,9 @@ class Toolkit(BaseLayer):
 
         _tools = ['sel', 'rect', 'line', 'pen',
                   'circle', 'free', 'color', 'blur',
-                  'close', 'save', 'upload']
+                  'close', 'save']
+        if self.config.parse['config']['canvas']['upload_service'] != 'Disabled':
+            _tools.append('upload')
 
         self.tools = {x:QPushButton() for x in _tools}
 
@@ -664,7 +666,8 @@ class Toolkit(BaseLayer):
         right_grid_frame.setLayout(right_grid)
 
         grid.addWidget(self.tools['save'], 0, 1)
-        grid.addWidget(self.tools['upload'], 0, 2)
+        if self.config.parse['config']['canvas']['upload_service'] != 'Disabled':
+            grid.addWidget(self.tools['upload'], 0, 2)
         grid.addWidget(self.tools['close'], 0, 3)
         grid.addWidget(self.tools['sel'], 1, 2)
         grid.addWidget(self.tools['pen'], 1, 0)

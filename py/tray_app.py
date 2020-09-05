@@ -42,6 +42,27 @@ class SignalWakeupHandler(QtNetwork.QAbstractSocket):
 
     signalReceived = QtCore.pyqtSignal(int)
 
+class OnclickOverlay(QtWidgets.QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        __current_screen = QtWidgets.QApplication.desktop().cursor().pos()
+        __screen = QtWidgets.QDesktopWidget().screenNumber(__current_screen)
+        __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
+
+        self.setGeometry(0, 0, __screen_geo.width(), __screen_geo.height())
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
+
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
+                            | QtCore.Qt.FramelessWindowHint \
+                            | QtCore.Qt.X11BypassWindowManagerHint)
+        self.move(__screen_geo.left(), __screen_geo.top())
+        self.setWindowOpacity(0)
+
+    def mousePressEvent(self, event):
+        self.parent.initCaptureCheck(False, 0)
+        self.close()
+
 class Tray(QtWidgets.QWidget):
     trigger = QtCore.pyqtSignal()
     
@@ -52,6 +73,7 @@ class Tray(QtWidgets.QWidget):
         self.fallback = fallback
         self.window = None
         self.main_window = None
+        self.onclick_overlay = OnclickOverlay(self)
 
         SignalWakeupHandler(self.app, self)
         
@@ -113,7 +135,22 @@ class Tray(QtWidgets.QWidget):
         quit_action.triggered.connect(self.close)
 
         tray_menu = QtWidgets.QMenu()
+        capture_menu = QtWidgets.QMenu("Delay", tray_menu)
+        _5_sec = QtWidgets.QAction("5 sec.", capture_menu)
+        _5_sec.triggered.connect(lambda _: self.initCaptureCheck(delay=5))
+        _10_sec = QtWidgets.QAction("10 sec.", capture_menu)
+        _10_sec.triggered.connect(lambda _: self.initCaptureCheck(delay=10))
+        _15_sec = QtWidgets.QAction("15 sec.", capture_menu)
+        _15_sec.triggered.connect(lambda _: self.initCaptureCheck(delay=15))
+        onclick = QtWidgets.QAction("On click", capture_menu)
+        onclick.triggered.connect(self.invoke_onclick)
+        capture_menu.addAction(_5_sec)
+        capture_menu.addAction(_10_sec)
+        capture_menu.addAction(_15_sec)
+        capture_menu.addAction(onclick)
+
         tray_menu.addAction(capture_action)
+        tray_menu.addMenu(capture_menu)
         tray_menu.addAction(show_action)
         tray_menu.addAction(quit_action)
 
@@ -123,19 +160,29 @@ class Tray(QtWidgets.QWidget):
     def closeEvent(self, event):
         exit(0)
 
+    def invoke_onclick(self):
+        self.onclick_overlay.show()
+
     @QtCore.pyqtSlot()
-    def initCaptureCheck(self, default_delay=True):
+    def initCaptureCheck(self, default_delay=True, delay=0):
         gc.collect()
         try:
             if self.window and self.window.isVisible():
                 print("Dialog already exists")
+            elif self.window and self.window.thread:
+                if self.window.thread.isRunning():
+                    pass
             else:
-                if default_delay:
+                if delay:
+                    sleep(delay)
+                elif default_delay:
                     sleep(self.config.parse["config"]["default_delay"])
                 self.initCapture()
         except RuntimeError:
             # C++ window destroyed
-            if default_delay:
+            if delay:
+                sleep(delay)
+            elif default_delay:
                 sleep(self.config.parse["config"]["default_delay"])
             self.initCapture()
 
@@ -143,5 +190,7 @@ class Tray(QtWidgets.QWidget):
         gc.collect()
         if self.main_window and self.main_window.isVisible():
             print("Dialog already exists")
+        elif self.main_window and self.main_window.was_hidden:
+            self.main_window.show()
         else:
             self.initScreen()

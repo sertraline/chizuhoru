@@ -9,6 +9,7 @@ import os
 import requests
 
 from Xlib.display import Display
+from time import sleep
 
 class NoLinkException(Exception):
     pass
@@ -19,7 +20,7 @@ class ImageToolkit():
         self.app = app
         self.config = config
 
-        self.timeout = 10
+        self.timeout = 20
 
     def grep_window(self):
         """
@@ -44,14 +45,13 @@ class ImageToolkit():
         ext = filepath.split('.')
         if randname:
             name = self.get_name(ext)
-
+    
         try:
             iof = open(filepath, 'rb')
         except Exception as e:
             if parent:
-                parent.out.clear()
-                parent.out.setText(str(e))
-            return
+                parent.emit([str(e), None])
+            return str(e)
 
         files = {
             'fileToUpload': (name, iof, 'image/png')
@@ -61,21 +61,19 @@ class ImageToolkit():
             'userhash': ''
         }
         if parent:
-            parent.out.clear()
             text = f'POST {link}\n<{name}>\n\n'
-            parent.out.setText(text)
+            parent.emit([text, None])
         try:
+            if parent:
+                sleep(1)
             response = requests.post(link, data=data, files=files, timeout=self.timeout)
         except Exception as e:
             if parent:
-                parent.out.clear()
-                parent.out.setText(str(e))
-            return
+                parent.emit([str(e)])
+            return str(e)
         if parent:
-            text = parent.out.toPlainText()
-            text += f'{response}\n{response.headers}\n\n'
-            text += f'{response.text}'
-            parent.out.setText(text)
+            text = f'{response}\n{response.headers}\n\n{response.text}'
+            parent.emit([text])
         return response.text
 
 
@@ -91,30 +89,28 @@ class ImageToolkit():
             iof = open(filepath, 'rb')
         except Exception as e:
             if parent:
-                parent.out.clear()
-                parent.out.setText(str(e))
-            return
+                parent.emit([str(e), None])
+            return str(e)
 
         files = {
             'name': (None, name),
             'file': (name, iof)
         }
         if parent:
-            parent.out.clear()
             text = f'POST {link}\n<{name}>\n\n'
-            parent.out.setText(text)
+            parent.emit([text, None])
         try:
+            if parent:
+                sleep(1)
             response = requests.post(link, files=files, timeout=self.timeout)
         except Exception as e:
             if parent:
-                parent.out.clear()
-                parent.out.setText(str(e))
-            return
+                parent.emit([str(e), None])
+            return str(e)
+
         if parent:
-            text = parent.out.toPlainText()
-            text += f'{response}\n{response.headers}\n\n'
-            text += f'{response.text}'
-            parent.out.setText(text)
+            text = f'{response}\n{response.headers}\n\n{response.text}'
+            parent.emit([text])
         return response.text
 
 
@@ -134,28 +130,30 @@ class ImageToolkit():
             iof = open(filepath, 'rb')
         except Exception as e:
             if parent:
-                parent.out.clear()
-                parent.out.setText(str(e))
-            return None, None
+                parent.emit([str(e), None])
+            return str(e), None
 
         files = {
             'image': (name, iof),
         }
         if parent:
-            parent.out.clear()
             text = f'POST {imgur_url}\n{headers}\n<{name}>\n\n'
-            parent.out.setText(text)
+            parent.emit([text, None])
         try:
+            if parent:
+                sleep(1)
             response = requests.post(imgur_url, headers=headers, files=files, timeout=self.timeout)
         except Exception as e:
             if parent:
-                parent.out.clear()
-                parent.out.setText(str(e))
-            return None, None
+                parent.emit([str(e), None])
+            return str(e), None
         if parent:
-            text = parent.out.toPlainText()
-            text += f'{response}\n{response.headers}\n\n'
-            text += f'{response.text}'
-            parent.out.setText(text)
-        jtext = json.loads(response.text)
+            text = f'{response}\n{response.headers}\n\n{response.text}'
+            parent.emit([text])
+        try:
+            jtext = json.loads(response.text)
+        except json.decoder.JSONDecodeError as e:
+            if parent:
+                parent.emit([str(e), None])
+            return str(e), None
         return jtext["data"]["link"], jtext["data"]["deletehash"]

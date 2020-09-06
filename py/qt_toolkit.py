@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import QVBoxLayout, QLabel, QLineEdit, QFrame, QSlider
 from PyQt5.QtWidgets import QPushButton, QGridLayout, QComboBox, QSpinBox
 from PyQt5.QtWidgets import QSpacerItem, QWidget, QSizePolicy
 
+import time
+
 def hex_to_rgb(hexv):
     hexv = hexv[1:]
     if not hexv:
@@ -136,15 +138,27 @@ class ToolsConfig(QtWidgets.QDialog):
                          self.parent.pos().y() - 122,
                          widget_width, widget_height)
 
-        _palette = self.parent.config.parse['colors']
-        self.colors = {
-            'red': _palette['red'],
-            'yellow': _palette['yellow'],
-            'green': _palette['green'],
-            'blue': _palette['blue'],
-            'white': _palette['white'],
-            'black': _palette['black']
+        _pen_palette = self.parent.config.parse['config']['pen_colors']
+        _brush_palette = self.parent.config.parse['config']['brush_colors']
+        self.pen_colors = {
+            'red': _pen_palette['red'],
+            'yellow': _pen_palette['yellow'],
+            'green': _pen_palette['green'],
+            'blue': _pen_palette['blue'],
+            'white': _pen_palette['white'],
+            'black': _pen_palette['black']
         }
+        self.brush_colors = {
+            'red': _brush_palette['red'],
+            'yellow': _brush_palette['yellow'],
+            'green': _brush_palette['green'],
+            'blue': _brush_palette['blue'],
+            'white': _brush_palette['white'],
+            'black': _brush_palette['black']
+        }
+        # check for doubleclick
+        self.pen_click = None
+        self.brush_click = None
         self.initUI()
     
     def initUI(self):
@@ -161,7 +175,7 @@ class ToolsConfig(QtWidgets.QDialog):
         two_2 = QHBoxLayout()
         two_3 = QHBoxLayout()
 
-        self.pens = {x:QPushButton() for x in self.colors.keys()}
+        self.pens = {x:QPushButton() for x in self.pen_colors.keys()}
 
         self.btn_css = (
         """
@@ -192,7 +206,7 @@ class ToolsConfig(QtWidgets.QDialog):
         """)
 
         for key in self.pens.keys():
-            self.pens[key].setStyleSheet(self.btn_css % self.colors[key])
+            self.pens[key].setStyleSheet(self.btn_css % self.pen_colors[key])
             self.pens[key].clicked.connect(self.pen_sel)
 
         two_1.addWidget(self.pens['red'])
@@ -227,10 +241,10 @@ class ToolsConfig(QtWidgets.QDialog):
         two_2_brush = QHBoxLayout()
         two_3_brush = QHBoxLayout()
  
-        self.brushes = {x:QPushButton() for x in self.colors.keys()}
+        self.brushes = {x:QPushButton() for x in self.brush_colors.keys()}
 
         for cc, key in enumerate(self.brushes.keys()):
-            self.brushes[key].setStyleSheet(self.btn_css % self.colors[key])
+            self.brushes[key].setStyleSheet(self.btn_css % self.brush_colors[key])
             self.brushes[key].clicked.connect(self.brush_sel)
 
         two_1_brush.addWidget(self.brushes['red'])
@@ -488,41 +502,61 @@ class ToolsConfig(QtWidgets.QDialog):
 
     def reset_pen_btn_css(self):
         for key in self.pens.keys():
-            self.pens[key].setStyleSheet(self.btn_css % self.colors[key])
+            self.pens[key].setStyleSheet(self.btn_css % self.pen_colors[key])
 
     def reset_brush_btn_css(self):
         for key in self.brushes.keys():
-            self.brushes[key].setStyleSheet(self.btn_css % self.colors[key])
+            self.brushes[key].setStyleSheet(self.btn_css % self.brush_colors[key])
 
     @QtCore.pyqtSlot()
     def pen_sel(self, key=None):
         def submit(key):
             self.reset_pen_btn_css()
-            self.pens[key].setStyleSheet(self.btn_css_active % self.colors[key])
-            self.parent.current_pen_color = hex_to_rgb(self.colors[key])
-            self.parent.config.changeConfig("canvas", "last_pen_color", self.colors[key])
+            self.pens[key].setStyleSheet(self.btn_css_active % self.pen_colors[key])
+            self.parent.current_pen_color = hex_to_rgb(self.pen_colors[key])
+            self.parent.config.changeConfig("canvas", "last_pen_color", self.pen_colors[key])
             self.parent.update_pen_color()
         if key:
             submit(key)
             return
         for key in self.pens.keys():
             if self.sender() is self.pens[key]:
+                if self.pen_click and time.time() - self.pen_click[0] <= 1:
+                    if self.pen_click[1] == self.sender():
+                        color = self.parent.invoke_color_dialog(self.pen_colors[key])
+                        color = QtGui.QColor(color).getRgb()
+                        color = color[:-1]
+                        color = '#{:02x}{:02x}{:02x}'.format(*color)
+                        self.pen_colors[key] = color
+                        self.parent.config.changeConfig("pen_colors", key, color)
+
                 submit(key)
+                self.pen_click = [time.time(), self.sender()]
                 return
 
     def brush_sel(self, key=None):
         def submit(key):
             self.reset_brush_btn_css()
-            self.brushes[key].setStyleSheet(self.btn_css_active % self.colors[key])
-            self.parent.current_brush_color = hex_to_rgb(self.colors[key])
-            self.parent.config.changeConfig("canvas", "last_brush_color", self.colors[key])
+            self.brushes[key].setStyleSheet(self.btn_css_active % self.brush_colors[key])
+            self.parent.current_brush_color = hex_to_rgb(self.brush_colors[key])
+            self.parent.config.changeConfig("canvas", "last_brush_color", self.brush_colors[key])
             self.parent.update_brush_color()
         if key:
             submit(key)
             return
         for key in self.brushes.keys():
             if self.sender() is self.brushes[key]:
+                if self.brush_click and time.time() - self.brush_click[0] <= 1:
+                    if self.brush_click[1] == self.sender():
+                        color = self.parent.invoke_color_dialog(self.brush_colors[key])
+                        color = QtGui.QColor(color).getRgb()
+                        color = color[:-1]
+                        color = '#{:02x}{:02x}{:02x}'.format(*color)
+                        self.brush_colors[key] = color
+                        self.parent.config.changeConfig("brush_colors", key, color)
+
                 submit(key)
+                self.brush_click = [time.time(), self.sender()]
                 return
 
 class Toolkit(BaseLayer):
@@ -555,7 +589,7 @@ class Toolkit(BaseLayer):
         _pen = self.config.parse["config"]["canvas"]["last_pen_color"]
         _brush = self.config.parse["config"]["canvas"]["last_brush_color"]
 
-        _def_col = self.parent.config.parse['colors']['red']
+        _def_col = self.parent.config.parse['config']['pen_colors']['red']
         self.current_pen_color = hex_to_rgb(_def_col) if not _pen else hex_to_rgb(_pen)
         self.current_brush_color = hex_to_rgb(_def_col) if not _brush else hex_to_rgb(_brush)
 
@@ -595,14 +629,14 @@ class Toolkit(BaseLayer):
         if not _brush:
             self.tools_config.brush_sel('red')
         else:
-            for key in self.tools_config.colors.keys():
-                if _brush == self.tools_config.colors[key]:
+            for key in self.tools_config.brush_colors.keys():
+                if _brush == self.tools_config.brush_colors[key]:
                     self.tools_config.brush_sel(key)
         if not _pen:
             self.tools_config.pen_sel('red')
         else:
-            for key in self.tools_config.colors.keys():
-                if _pen == self.tools_config.colors[key]:
+            for key in self.tools_config.pen_colors.keys():
+                if _pen == self.tools_config.pen_colors[key]:
                     self.tools_config.pen_sel(key)
         self.masked = False
         self.initUI()
@@ -702,6 +736,27 @@ class Toolkit(BaseLayer):
     def close_clicked(self):
         self.close()
         self.parent.close()
+
+    def invoke_color_dialog(self, color):
+        self.cdialog = QtWidgets.QColorDialog(self.tools_config)
+        self.tools_config_outline.setWindowOpacity(0)
+        self.tools_config.setWindowOpacity(0)
+        self.setWindowOpacity(0)
+        self.tools_config.lower()
+        self.tools_config_outline.lower()
+
+        flags = self.cdialog.windowFlags()
+        self.cdialog.setWindowFlags(flags | Qt.Tool)
+        self.cdialog.setCurrentColor(QtGui.QColor(color))
+        _q = self.cdialog.getColor(QtGui.QColor(color))
+        self.setWindowOpacity(1)
+        self.tools_config_outline.setWindowOpacity(0.6)
+        self.tools_config.setWindowOpacity(1)
+        self.tools_config_outline.raise_()
+        self.tools_config.raise_()
+        if not _q.isValid():
+            return color
+        return _q
 
     def showEvent(self, event):
         self.show()

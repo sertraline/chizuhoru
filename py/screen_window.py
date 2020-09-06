@@ -742,6 +742,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         elif qKeyEvent.key() == QtCore.Qt.Key_Escape:
             self.closeScreen()
 
+        elif qKeyEvent.nativeScanCode() >= 10 and qKeyEvent.nativeScanCode() <= 16:
+            for key in self.toolkit.switches:
+                if qKeyEvent.nativeScanCode() == key[1]+10:
+                    self.toolkit.tool_sel(key[0])
+                    return
+
         elif qKeyEvent.nativeScanCode() == 28: #"T" key
             if self.toolkit.isVisible():
                 self.toolkit.hide()

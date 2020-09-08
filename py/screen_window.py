@@ -193,9 +193,17 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             if self.paint_allowed:
                 # switch 1: pen drawing, switch 5: free drawing
                 if self.toolkit.switch == 5:
-                    if self.pen_cords_track_list:
-                        for point in self.pen_cords_track_list:
-                            painter.drawPoint(point[0], point[1])
+                    if not self.pen_point_list:
+                        return
+                    self.build_path()
+                    if not self.path:
+                        return
+
+                    if pen_outline:
+                        painter.setPen(pen_outline)
+                        painter.drawPath(self.path)
+                        painter.setPen(pen)
+                    painter.drawPath(self.path)
                 elif self.toolkit.switch == 2:
                     if pen_outline:
                         painter.setPen(pen_outline)
@@ -254,6 +262,9 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
             if self.toolkit.switch == 5:
                 self.pen_point_list = []
+            elif self.toolkit.switch == 1:
+                self.last_x = event.x()
+                self.last_y = event.y()
             self.begin = event.pos()
             self.end = event.pos()
 
@@ -318,13 +329,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.setPen(QtGui.QPen(self.toolkit.pen_color,
                                       self.toolkit.pen_size))
 
-            if abs(self.last_x - event.x()) > 3 or \
-                abs(self.last_y - event.y() > 3):
-                # reset last mouse coordinates if 
-                # distance between points is too big
-                self.last_x = event.x()
-                self.last_y = event.y()
-
             pen = QtGui.QPen(self.toolkit.pen_color, self.toolkit.pen_size,
                              self.toolkit.pen_style, self.toolkit.cap, self.toolkit.joint)
             brush = QtGui.QBrush(self.toolkit.brush_color)
@@ -332,6 +336,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.setPen(pen)
 
             if self.toolkit.switch == 5:
+                self.last_x = event.x()
+                self.last_y = event.y()
                 draw_args = QtCore.QPoint(self.last_x, self.last_y)
                 self.pen_point_list.append(draw_args)
                 self.pen_cords_track_list.append((event.x(), event.y()))
@@ -392,15 +398,23 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.path = QtGui.QPainterPath(points[0])
         cp1 = None
         if len(points) > 6:
-            # throw away excess points to make curve smooth
+            # throw away excess points to make curve smoother
             points = points[::5]
-        for count, point in enumerate(points):
-            if count < 1 or not points[count-1]:
-                continue
-            if abs(point.x() - points[count-1].x()
-                  ) < 7 or abs(point.y() - points[count-1].y()) < 7:
-                points[count] = None
+
+            for count, point in enumerate(points):
+                if count < 1 or not points[count-1]:
+                    continue
+                if abs(point.x() - points[count-1].x()
+                    ) < 10 or abs(point.y() - points[count-1].y()) < 10:
+                    check_points = [x for x in points if x]
+                    if len(check_points) > 4:
+                        points[count] = None
+
         points = [x for x in points if x]
+        if len(points) < 3:
+            for point in points:
+                self.path.lineTo(point.x(), point.y())
+            return
 
         for p, current in enumerate(points[1:-1], 1):
             # previous segment
@@ -416,7 +430,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             revTarget = QtCore.QLineF.fromPolar(source.length() * factor,
                                                 angle + 180).translated(current)
             cp2 = revTarget.p2()
-
             try:
                 if p == 1:
                     self.path.quadTo(cp2, current)
@@ -424,7 +437,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     if cp1:
                         self.path.cubicTo(cp1, cp2, current)
             except TypeError:
-                return None
+                continue
 
             revSource = QtCore.QLineF.fromPolar(target.length() * factor,
                                                 angle).translated(current)
@@ -581,8 +594,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.drawPath(self.path)
 
             self.pen_cords_track_list = []
-            self.begin = QtCore.QPoint()
-            self.end = QtCore.QPoint()
             self.scene_px.setPixmap(self.pixmap())
             self.pixel_data = self.pixmap().toImage()
             self.update()

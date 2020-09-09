@@ -91,7 +91,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.view.setStyleSheet("border: 6px solid rgba(0, 0, 0, 60);")
         self.pixel_info = QtWidgets.QWidget(self)
 
-        self.pixel_info.setFixedSize(128, 24)
+        self.pixel_info.setFixedSize(128, 26)
         self.pixel_info_label = QtWidgets.QLabel()
         _font = QtGui.QFont()
         _font.setPointSize(8)

@@ -105,7 +105,7 @@ class Tray(QtWidgets.QWidget):
         self.tray_icon.setIcon(self.chz_ico_tray)
         self.app.setApplicationName('Chizuhoru')
 
-        self.tray_icon.activated.connect(lambda x: self.initCaptureCheck(default_delay=False))
+        self.tray_icon.activated.connect(self.tray_clicked)
         capture_action = QtWidgets.QAction("Capture", self)
         show_action = QtWidgets.QAction("Show", self)
         quit_action = QtWidgets.QAction("Exit", self)
@@ -142,6 +142,10 @@ class Tray(QtWidgets.QWidget):
 
     def invoke_onclick(self):
         self.onclick_overlay.show()
+
+    def tray_clicked(self, reason):
+        if reason == 3:
+            self.initCaptureCheck(default_delay=False)
 
     @QtCore.pyqtSlot()
     def initCaptureCheck(self, default_delay=True, delay=0):

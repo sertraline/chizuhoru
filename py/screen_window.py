@@ -774,9 +774,14 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                                 | Qt.WindowTransparentForInput \
                                 | QtCore.Qt.FramelessWindowHint \
                                 | QtCore.Qt.Tool)
-            self.rectw, self.recth, self.rectx, self.recty = self.img_toolkit.grep_window()
+
+            self.rectx, self.recty, \
+                self.rectw, self.recth = self.img_toolkit.grep_window()
+
             point_zero = QtCore.QPoint(self.rectx, self.recty)
-            point_one = QtCore.QPoint((self.rectx+self.rectw), (self.recty+self.recth))
+            point_one = QtCore.QPoint((self.rectx+self.rectw),
+                                      (self.recty+self.recth))
+
             self.cords = QtCore.QRect(point_zero, point_one)
             self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
                                 | QtCore.Qt.FramelessWindowHint \

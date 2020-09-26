@@ -887,16 +887,12 @@ class MainWindow(QtWidgets.QWidget):
             self.app.clipboard().setText(value)
 
     def update_upload_copyclip_state(self):
-        if self.copy_check.isChecked():
-            self.config.changeConfig('upload', 'clipboard_state', 1)
-        else:
-            self.config.changeConfig('upload', 'clipboard_state', 0)
+        self.config.changeConfig('upload', 'clipboard_state',
+                                            int(self.copy_check.isChecked()))
 
     def update_upload_randname_state(self):
-        if self.name_check.isChecked():
-            self.config.changeConfig('upload', 'random_fname_state', 1)
-        else:
-            self.config.changeConfig('upload', 'random_fname_state', 0)
+        self.config.changeConfig('upload', 'random_fname_state',
+                                            int(self.name_check.isChecked()))
 
     def update_last_serv(self):
         self.config.changeConfig('upload', 'last_service', self.up_comb.currentText())
@@ -921,10 +917,8 @@ class MainWindow(QtWidgets.QWidget):
         self.config.changeConfig('canvas', 'save_action', new)
 
     def update_img_clip(self):
-        if self.img_check.isChecked():
-            self.config.changeConfig('canvas', 'img_clip', 1)
-        else:
-            self.config.changeConfig('canvas', 'img_clip', 0)
+        self.config.changeConfig('canvas', 'img_clip',
+                                            int(self.img_check.isChecked()))
 
     def update_ico(self):
         new_ico = self.ico_comb.currentText()

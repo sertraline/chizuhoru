@@ -30,7 +30,7 @@ class ImageToolkit():
         window = display.screen().root
         result = window.query_pointer()
         dims = result.child.get_geometry()
-        return (dims.width, dims.height, dims.x, dims.y)
+        return (dims.x, dims.y, dims.width-1, dims.height-1)
 
     def get_name(self, ext):
         name = str(uuid.uuid4())[:14].replace('-', '')

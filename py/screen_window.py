@@ -70,7 +70,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
         filename_format = self.config.parse["config"]["filename_format"]
-        filename = "{}.png".format(datetime.now().strftime(filename_format))
+        filename = "%s.png" % datetime.now().strftime(filename_format)
         self.filepath = os.path.join(save_dir, filename)
 
         # move instance to current screen
@@ -105,7 +105,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         # define image processing methods separated from GUI
         self.img_toolkit = image_toolkit
-        # define right-click control menu
+        # get open windows coordinates
+        self.active_windows = self.img_toolkit.grep_windows()
+
+        # define right-click control panel
         self.toolkit = qt_toolkit.Toolkit(self, self.config, fallback)
         self.toolkit.setMouseTracking(True)
 
@@ -770,24 +773,21 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.hideScreen()
 
         elif qKeyEvent.nativeScanCode() == 38: #"A" key
-            self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
-                                | Qt.WindowTransparentForInput \
-                                | QtCore.Qt.FramelessWindowHint \
-                                | QtCore.Qt.Tool)
+            cur_pos = QtGui.QCursor.pos()
+            cur_window = []
+            for window in self.active_windows:
+                x, y = window.x, window.y
+                w, h = x+window.width-1, y+window.height-1
+                # match window cords to mouse pointer
+                if cur_pos.x() >= x and cur_pos.y() >= y \
+                    and cur_pos.x() <= w and cur_pos.y() <= h:
+                    cur_window = [x, y, w, h]
 
-            self.rectx, self.recty, \
-                self.rectw, self.recth = self.img_toolkit.grep_window()
-
-            point_zero = QtCore.QPoint(self.rectx, self.recty)
-            point_one = QtCore.QPoint((self.rectx+self.rectw),
-                                      (self.recty+self.recth))
-
-            self.cords = QtCore.QRect(point_zero, point_one)
-            self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
-                                | QtCore.Qt.FramelessWindowHint \
-                                | QtCore.Qt.Tool)
-            self.showFullScreen()
-        
+            x, y, w, h = cur_window
+            self.cords = QtCore.QRect(QtCore.QPoint(x, y),
+                                      QtCore.QPoint(w, h))
+            self.scene_sel.setRect(x+0.4, y+0.4,
+                                   w-x, h-y)
         elif qKeyEvent.nativeScanCode() == 52: #"Z"
             if self.view.isVisible():
                 self.pixel_info.hide()

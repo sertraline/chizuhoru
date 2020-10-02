@@ -9,6 +9,7 @@ import os
 import requests
 
 from Xlib.display import Display
+from Xlib import X
 from time import sleep
 
 class NoLinkException(Exception):
@@ -22,15 +23,21 @@ class ImageToolkit():
 
         self.timeout = 20
 
-    def grep_window(self):
+    def grep_windows(self):
         """
-        Get window coordinates under the mouse pointer.
+        Get visible window coordinates.
         """
         display = Display()
-        window = display.screen().root
-        result = window.query_pointer()
-        dims = result.child.get_geometry()
-        return (dims.x, dims.y, dims.width-1, dims.height-1)
+        root = display.screen().root
+        query = root.query_tree()
+
+        active_windows = []
+        for c in query.children:
+            attrs = c.get_attributes()
+            if attrs.map_state == X.IsViewable:
+                geom = c.get_geometry()
+                active_windows.append(geom)
+        return active_windows
 
     def get_name(self, ext):
         name = str(uuid.uuid4())[:14].replace('-', '')

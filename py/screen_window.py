@@ -660,8 +660,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.quadratic = True
             return
         # is responsible for Ctrl-Z both in English and Cyrillic moonspeak
-        elif (qKeyEvent.nativeModifiers() == 4 or qKeyEvent.nativeModifiers() == 8196
-           ) and (qKeyEvent.nativeScanCode() == 52):
+        elif (qKeyEvent.modifiers() & QtCore.Qt.ControlModifier) \
+            and (qKeyEvent.nativeScanCode() == 52):
             if len(self.history.sequence) == 0:
                 return
 

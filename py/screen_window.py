@@ -612,7 +612,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             if outline == 'black':
                 out_color = QtGui.QColor('black')
             else:
-                out_color = self.toolkit.brush_color
+                out_color = QtGui.QColor(*self.toolkit.color.bg.color)
                 out_color = out_color.toRgb()
                 out_color.setAlpha(255)
             pen_outline = QtGui.QPen(out_color, self.toolkit.pen_size + 2,

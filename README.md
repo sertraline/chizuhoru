@@ -1,6 +1,8 @@
 ## Chizuhoru - screenshot tool for Linux  
 
-![Paint preview](https://i.imgur.com/EfbQ6JT.png)  
+<p align="center">
+  <img src="https://i.imgur.com/2zakpIg.png" />
+</p>
 
 ## Features
 - Editor: painting, shapes, cropping, blur
@@ -11,7 +13,7 @@
   - Imgur links are stored with delete hash. Delete hash allows you to remove image from Imgur. You can access it through context menu on any Imgur item.
 
 ### Can I see it in action?
-[demo](https://i.imgur.com/QR8wNb3.gif) (gif, 6MB)
+[demo](https://i.imgur.com/1PC34J5.gif?raw=True) (gif, 5MB)
 
 ### Easy install  
 

@@ -1,7 +1,7 @@
 from screenshot import ScreenshotCLI
-from PyQt5.QtGui import QPainter, QImage, QPalette, QBrush
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QSize, Qt, QPoint
+from PyQt5.QtGui import QPainter, QImage, QBrush
+from PyQt5 import QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 
 from datetime import datetime
@@ -15,11 +15,13 @@ from main_window import HistoryItem
 
 import ctypes
 import sip
+
 try:
     qtgui = ctypes.CDLL('libQt5Widgets.so')
 except:
     qtgui = ctypes.CDLL('libQt5Widgets.so.5')
 _qt_blurImage = qtgui._Z12qt_blurImageP8QPainterR6QImagedbbi
+
 
 class Worker(QtCore.QObject):
     finished = QtCore.pyqtSignal(list)
@@ -43,6 +45,88 @@ class Worker(QtCore.QObject):
             ret_val = self.fn(*self.args)
             self.finished.emit([self.args[1], ret_val, None])
 
+
+class ConfirmationWindow(QtWidgets.QDialog):
+    def __init__(self, parent, service, image):
+        super().__init__()
+        self.p = parent
+        self.service = service
+        self.image = image
+        self.result = []
+
+        self.setGeometry(0, 0, 500, 350)
+        self.setWindowTitle("Upload confirmation")
+        self.move((self.p.width // 2) - 250, (self.p.height // 2) - 175)
+        self.setWindowIcon(self.p.parent.chz_ico)
+
+        self.setModal(True)
+
+        self.init_layout()
+        self.raise_()
+        self.exec()
+        self.activateWindow()
+
+    def init_layout(self):
+        vb = QtWidgets.QVBoxLayout()
+
+        img_frame = QtWidgets.QFrame()
+        img_frame.setFixedSize(480, 300)
+        img_frame.setStyleSheet('background-image: url(%s/img/ts.png);' % sys.path[0])
+
+        img_layout = QtWidgets.QHBoxLayout()
+        img_container = QtWidgets.QLabel()
+        img = QtGui.QPixmap(self.image)
+
+        transformation = Qt.SmoothTransformation
+        if img.size().width() < 100 or img.size().height() < 100:
+            transformation = Qt.FastTransformation
+        img = img.scaled(460, 280, Qt.KeepAspectRatio,
+                         transformation)
+        img_container.setPixmap(img)
+        img_layout.addWidget(img_container)
+        img_layout.setAlignment(Qt.AlignCenter)
+        img_frame.setLayout(img_layout)
+        vb.addWidget(img_frame)
+
+        service_info = QtWidgets.QLabel('Upload to: %s' % self.service)
+        service_info.setFixedHeight(46)
+        vb.addWidget(service_info)
+
+        setting_layout = QtWidgets.QHBoxLayout()
+        title = QtWidgets.QLabel('Don\'t ask next time')
+        title.setFixedWidth(200)
+        self.setting_box = QtWidgets.QCheckBox()
+        setting_layout.addWidget(self.setting_box)
+        setting_layout.addWidget(title)
+        setting_layout.setAlignment(Qt.AlignLeft)
+
+        hb_buttons = QtWidgets.QHBoxLayout()
+        hb_buttons.setAlignment(Qt.AlignRight)
+        hb_buttons.setSpacing(4)
+
+        confirm = QtWidgets.QPushButton('Upload')
+        confirm.clicked.connect(self.confirmed)
+        confirm.setFixedWidth(120)
+        cancel = QtWidgets.QPushButton('Cancel')
+        cancel.clicked.connect(self.cancelled)
+        cancel.setFixedWidth(120)
+
+        hb_buttons.addItem(setting_layout)
+        hb_buttons.addWidget(confirm)
+        hb_buttons.addWidget(cancel)
+
+        vb.addItem(hb_buttons)
+        self.setLayout(vb)
+
+    def confirmed(self):
+        self.result = [1, self.setting_box.isChecked()]
+        self.close()
+
+    def cancelled(self):
+        self.result = [0, self.setting_box.isChecked()]
+        self.close()
+
+
 class EventHistory:
     def __init__(self):
         self.pen = []
@@ -55,6 +139,7 @@ class EventHistory:
         # string takes less memory than a list
         self.sequence = ''
 
+
 class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
     def __init__(self, parent, app, config, image_toolkit, fallback):
@@ -64,8 +149,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.app = app
         self.config = config
         self.screen_unit = ScreenshotCLI()
-        self.thread = None
 
+        # uploads
+        self.thread = None
+        self.confirmation_win = None
+
+        # config
         save_dir = self.config.parse["config"]["default_dir"]
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
@@ -81,11 +170,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.temp.seek(0)
         self.pixel_data = None
 
-        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
-                            | QtCore.Qt.FramelessWindowHint \
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint
+                            | QtCore.Qt.FramelessWindowHint
                             | QtCore.Qt.Tool)
         self.setMouseTracking(True)
 
+        # magnifier
         self.scene = QtWidgets.QGraphicsScene()
         self.view = QtWidgets.QGraphicsView(self.scene, self)
         self.view.setStyleSheet("border: 6px solid rgba(0, 0, 0, 60);")
@@ -123,16 +213,18 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         brush = QBrush(QtGui.QPixmap(f"{sys.path[0]}/img/grid.png"))
         self.scene.setBackgroundBrush(brush)
 
-        borderColor = QtGui.QColor('black')
-        rect = QtCore.QRectF(0, 0, self.width*10, self.height*10)
+        border_color = QtGui.QColor('black')
+        rect = QtCore.QRectF(0, 0, self.width * 10, self.height * 10)
 
-        x = self.scene.addRect(rect,borderColor,brush)
+        x = self.scene.addRect(rect, border_color, brush)
         x.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations)
 
         self.view.move(self.width - 200, 40)
-        self.pixel_info.move(self.view.pos().x()+6, self.view.pos().y()+6)
+        self.pixel_info.move(self.view.pos().x() + 6, self.view.pos().y() + 6)
         self.pixel_info.setStyleSheet('background-color: rgba(0, 0, 0, 80);')
-        self.pixel_info_label.setStyleSheet('background-color: transparent; margin:0; padding:0;')
+        self.pixel_info_label.setStyleSheet("""
+            background-color: transparent; color: white; margin:0; padding:0;
+        """)
         self.pixel_info.show()
         self.view.setSceneRect(0, 0, 140, 140)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -166,6 +258,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         _brush = QtGui.QBrush(self.toolkit.brush_selection_color)
         self.scene_sel = self.scene.addRect(QtCore.QRectF(0, 0, 0, 0), _pen, _brush)
 
+        self.toolkit.show()
+
     def render_background(self):
         qimg = QtGui.QPixmap()
         qimg.loadFromData(self.temp.getvalue())
@@ -183,7 +277,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         painter.setRenderHint(QPainter.HighQualityAntialiasing)
 
         brush, pen, pen_outline = self.get_drawing_pen()
-        sel_pen = QtGui.QPen(self.toolkit.pen_selection_color, 2, Qt.DashLine)
+        sel_pen = QtGui.QPen(self.toolkit.pen_selection_color, 1, Qt.SolidLine)
         sel_brush = QtGui.QBrush(self.toolkit.brush_selection_color)
 
         painter.setPen(pen)
@@ -224,6 +318,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     painter.setBrush(sel_brush)
                     if self.begin != self.end:
                         painter.drawRect(rect)
+                        self.draw_cords(painter, rect.x(), rect.y(),
+                                        rect.width(), rect.height())
                         self.sel_rect = rect
             else:
                 # redraw last selection rectangle on RMB click
@@ -231,21 +327,52 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     painter.setPen(sel_pen)
                     painter.setBrush(sel_brush)
                     painter.drawRect(self.sel_rect)
+                    self.draw_cords(painter, self.sel_rect.x(), self.sel_rect.y(),
+                                    self.sel_rect.width(), self.sel_rect.height())
         else:
             painter.setPen(sel_pen)
             painter.setBrush(sel_brush)
             painter.drawRect(self.cords)
+
+            self.draw_cords(painter, self.cords.x(), self.cords.y(),
+                            self.cords.width(), self.cords.height())
             self.sel_rect = self.cords
             self.cords = None
 
+    def draw_cords(self, painter, *args):
+        """
+        Draw selection coordinates with black outline.
+        """
+        x, y, width, height = args
+        xpos = x + (width // 2) - 32
+        ypos = y + (height // 2)
+        if abs(width) < 100 or abs(height) < 100:
+            xpos = x
+            ypos = y - 12 if height > 0 else y + 24
+
+        for i in range(2):
+            color = 'black' if i == 0 else 'white'
+            size = 4 if i == 0 else 2
+
+            path = QtGui.QPainterPath()
+            font = QtGui.QFont()
+            font.setPixelSize(16)
+            painter.setPen(QtGui.QPen(QtGui.QColor(color), size))
+            painter.setBrush(QtGui.QBrush(QtGui.QColor(0, 0, 0, 0)))
+            path.addText(QtCore.QPoint(xpos, ypos), font,
+                         '%s X %s' % (abs(width), abs(height)))
+            painter.drawPath(path)
+
     def closeScreen(self):
+        if self.toolkit.tools_config.isVisible():
+            self.toolkit.tools_config.close()
         self.toolkit.close()
         self.temp = None
         self.pixel_data = QImage()
         gc.collect()
         self.deleteLater()
         self.close()
-  
+
     def hideScreen(self):
         self.hide()
         self.toolkit.hide()
@@ -253,10 +380,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
     def mousePressEvent(self, event):
         if event.buttons() == QtCore.Qt.RightButton:
             self.paint_allowed = False
-            if self.toolkit.isVisible():
-                self.toolkit.close()
+            if self.toolkit.tools_config.isVisible():
+                self.toolkit.tools_config.close()
             else:
-                self.toolkit.show()
+                self.toolkit.tools_config.show()
             return
         if event.buttons() == QtCore.Qt.LeftButton:
             self.paint_allowed = True
@@ -274,54 +401,46 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             cases = [0, 6, 4, 3, 2]
             if any(self.toolkit.switch == x for x in cases) and self.scene_sel:
                 x, y = self.begin.x(), self.begin.y()
-                width, height = self.end.x()-self.begin.x(), \
-                                self.end.y()-self.begin.y()
+                width, height = (self.end.x() - self.begin.x(),
+                                 self.end.y() - self.begin.y())
 
                 self.scene_sel.setRect(x, y, width, height)
             self.update()
 
     def mouseMoveEvent(self, event):
-        self.view.setSceneRect(
-            (event.x())-70,
-            (event.y())-70,
-            140, 140
-        )
-        self.view.centerOn(event.x(), event.y())
-        self.cursor.setPos((event.x()-8),
-                           (event.y()-8))
+        if self.view.isVisible():
+            self.view.setSceneRect(
+                (event.x()) - 70,
+                (event.y()) - 70,
+                140, 140
+            )
+            self.view.centerOn(event.x(), event.y())
+            self.cursor.setPos((event.x() - 8),
+                               (event.y() - 8))
 
-        _px = self.pixel_data.pixel(event.x(), event.y())
-        _px = QtGui.QColor(_px).getRgb()
-        _px = _px[:-1]
-        _info = '#{:02x}{:02x}{:02x}'.format(*_px)
-        _cords = f'{event.x()}, {event.y()}'
-        self.pixel_info_label.setText(f'{_info:<8} {_cords:>7}')
+            _px = self.pixel_data.pixel(event.x(), event.y())
+            _px = QtGui.QColor(_px).getRgb()
+            _px = _px[:-1]
+            _info = '#{:02x}{:02x}{:02x}'.format(*_px)
+            _cords = f'{event.x()}, {event.y()}'
+            self.pixel_info_label.setText(f'{_info:<8} {_cords:>7}')
 
-        xpos = event.x()-70
-        ypos = event.y()+20
-        if (event.x()-70 < 0):
-            xpos = event.x()
-        if (event.x()+70 > self.width):
-            xpos = event.x()-140
-        if (event.y()+170 > self.height):
-            ypos = event.y() - 170
+            xpos = event.x() - 70
+            ypos = event.y() + 20
+            if event.x() - 70 < 0:
+                xpos = event.x()
+            if event.x() + 70 > self.width:
+                xpos = event.x() - 140
+            if event.y() + 170 > self.height:
+                ypos = event.y() - 170
 
-        if self.toolkit.isVisible():
-            wstart = self.toolkit.pos().x()
-            ystart = self.toolkit.pos().y() - 35
-            wend = self.toolkit.pos().x() + self.toolkit.geometry().width()
-            yend = self.toolkit.pos().y() + self.toolkit.geometry().height()
-            if (event.y() >= ystart and event.y() <= yend) and \
-                (event.x() >= wstart-70 and event.x() <= wend+70):
-                ypos = ystart - 200
-
-        self.view.move(xpos, ypos)
-        self.pixel_info.move(self.view.pos().x()+6, self.view.pos().y()+6)
-        self.update()
+            self.view.move(xpos, ypos)
+            self.pixel_info.move(self.view.pos().x() + 6, self.view.pos().y() + 6)
+            self.update()
 
         # switch 1: pen drawing, switch 5: free drawing
         if (self.toolkit.switch == 1 or self.toolkit.switch == 5) \
-            and event.buttons() == QtCore.Qt.LeftButton:
+                and event.buttons() == QtCore.Qt.LeftButton:
             if self.last_x is None:
                 self.last_x = event.x()
                 self.last_y = event.y()
@@ -329,12 +448,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
             painter = QPainter(self.pixmap())
             painter.setRenderHint(QPainter.HighQualityAntialiasing)
-            painter.setPen(QtGui.QPen(self.toolkit.pen_color,
-                                      self.toolkit.pen_size))
 
-            pen = QtGui.QPen(self.toolkit.pen_color, self.toolkit.pen_size,
-                             self.toolkit.pen_style, self.toolkit.cap, self.toolkit.joint)
-            brush = QtGui.QBrush(self.toolkit.brush_color)
+            brush, pen, _ = self.get_drawing_pen()
             painter.setBrush(brush)
             painter.setPen(pen)
 
@@ -346,7 +461,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 self.pen_cords_track_list.append((event.x(), event.y()))
             else:
                 draw_args = ((self.last_x, self.last_y, event.x(), event.y()),
-                              pen, brush)
+                             pen, brush)
                 if len(self.history.pen) == 0:
                     self.history.sequence += 'p'
                     self.history.pen.append([])
@@ -371,14 +486,14 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             cases = [0, 6, 4, 3, 2]
             if any(self.toolkit.switch == x for x in cases) and self.scene_sel:
                 x, y = self.begin.x(), self.begin.y()
-                width, height = self.end.x()-self.begin.x(), \
-                                self.end.y()-self.begin.y()
+                width, height = (self.end.x() - self.begin.x(),
+                                 self.end.y() - self.begin.y())
 
                 if self.quadratic:
                     rect = self.rect_quadratic(QtCore.QRect(x, y, width, height))
                     x, y, width, height = rect.x(), rect.y(), rect.width(), rect.height()
 
-                self.scene_sel.setRect(x+0.4, y+0.4, width, height)
+                self.scene_sel.setRect(x + 0.4, y + 0.4, width, height)
             self.update()
 
     def build_rect(self):
@@ -405,10 +520,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             points = points[::5]
 
             for count, point in enumerate(points):
-                if count < 1 or not points[count-1]:
+                if count < 1 or not points[count - 1]:
                     continue
-                if abs(point.x() - points[count-1].x()
-                    ) < 10 or abs(point.y() - points[count-1].y()) < 10:
+                if abs(point.x() - points[count - 1].x()
+                       ) < 10 or abs(point.y() - points[count - 1].y()) < 10:
                     check_points = [x for x in points if x]
                     if len(check_points) > 4:
                         points[count] = None
@@ -424,15 +539,15 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             source = QtCore.QLineF(points[p - 1], current)
             # next segment
             target = QtCore.QLineF(current, points[p + 1])
-            targetAngle = target.angleTo(source)
-            if targetAngle > 180:
+            target_angle = target.angleTo(source)
+            if target_angle > 180:
                 angle = (source.angle() + source.angleTo(target) / 2) % 360
             else:
                 angle = (target.angle() + target.angleTo(source) / 2) % 360
 
-            revTarget = QtCore.QLineF.fromPolar(source.length() * factor,
-                                                angle + 180).translated(current)
-            cp2 = revTarget.p2()
+            rev_target = QtCore.QLineF.fromPolar(source.length() * factor,
+                                                 angle + 180).translated(current)
+            cp2 = rev_target.p2()
             try:
                 if p == 1:
                     self.path.quadTo(cp2, current)
@@ -450,19 +565,19 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
     def rect_quadratic(self, rect):
         rectx, recty, rectw, recth = list(rect.getRect())
-        if not '-' in str(recth) and not '-' in str(rectw):
+        if '-' not in str(recth) and '-' not in str(rectw):
             if rectw > recth:
                 rect = [rectx, recty, recth, recth]
             else:
                 rect = [rectx, recty, rectw, rectw]
         else:
-            if '-' in str(rectw) and not '-' in str(recth):
+            if '-' in str(rectw) and '-' not in str(recth):
                 ab_w = abs(rectw)
                 if ab_w > recth:
                     rect = [rectx, recty, -recth, recth]
                 else:
                     rect = [rectx, recty, rectw, ab_w]
-            elif '-' in str(recth) and not '-' in str(rectw):
+            elif '-' in str(recth) and '-' not in str(rectw):
                 ab_h = abs(recth)
                 if ab_h > recth:
                     rect = [rectx, recty, rectw, -rectw]
@@ -475,17 +590,19 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     rect = [rectx, recty, rectw, rectw]
         return QtCore.QRect(*rect)
 
-    def ctypes_blur(self, p, dest_img, radius, quality, alphaOnly, transposed=0):
+    def ctypes_blur(self, p, dest_img, radius, quality, alpha_only, transposed=0):
         p = ctypes.c_void_p(sip.unwrapinstance(p))
         dest_img = ctypes.c_void_p(sip.unwrapinstance(dest_img))
         radius = ctypes.c_double(radius)
         quality = ctypes.c_bool(quality)
-        alphaOnly = ctypes.c_bool(alphaOnly)
+        alpha_only = ctypes.c_bool(alpha_only)
         transposed = ctypes.c_int(transposed)
-        _qt_blurImage(p, dest_img, radius, quality, alphaOnly, transposed)
+        _qt_blurImage(p, dest_img, radius, quality, alpha_only, transposed)
 
     def get_drawing_pen(self):
-        pen = QtGui.QPen(self.toolkit.pen_color, self.toolkit.pen_size,
+        pen_color = QtGui.QColor(*self.toolkit.color.fg.color)
+        brush_color = QtGui.QColor(*self.toolkit.color.bg.color)
+        pen = QtGui.QPen(pen_color, self.toolkit.pen_size,
                          self.toolkit.pen_style, self.toolkit.cap, self.toolkit.joint)
         outline = self.config.parse['config']['canvas']['outline']
 
@@ -498,10 +615,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 out_color = self.toolkit.brush_color
                 out_color = out_color.toRgb()
                 out_color.setAlpha(255)
-            pen_outline = QtGui.QPen(out_color, self.toolkit.pen_size+2,
+            pen_outline = QtGui.QPen(out_color, self.toolkit.pen_size + 2,
                                      self.toolkit.pen_style, self.toolkit.cap,
                                      self.toolkit.joint)
-        brush = QtGui.QBrush(self.toolkit.brush_color)
+        brush = QtGui.QBrush(brush_color)
         return brush, pen, pen_outline
 
     def mouseReleaseEvent(self, event):
@@ -509,10 +626,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.update()
 
         if self.toolkit.switch == 0 and self.sel_rect \
-            and event.buttons() == QtCore.Qt.LeftButton:
+                and event.buttons() == QtCore.Qt.LeftButton:
             self.scene_sel.setRect(self.begin.x(), self.begin.y(),
-                                    self.end.x()-self.begin.x(),
-                                    self.end.y()-self.begin.y())
+                                   self.end.x() - self.begin.x(),
+                                   self.end.y() - self.begin.y())
             self.paint_allowed = False
         elif self.toolkit.switch == 0:
             self.paint_allowed = False
@@ -526,9 +643,9 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         if self.toolkit.switch == 6:
             self.scene_sel.setRect(self.begin.x(), self.begin.y(),
-                                    self.end.x()-self.begin.x(),
-                                    self.end.y()-self.begin.y())
-            rectwidth, rectheight, rectx, recty = (self.sel_rect.width(), 
+                                   self.end.x() - self.begin.x(),
+                                   self.end.y() - self.begin.y())
+            rectwidth, rectheight, rectx, recty = (self.sel_rect.width(),
                                                    self.sel_rect.height(),
                                                    self.sel_rect.x(),
                                                    self.sel_rect.y())
@@ -554,7 +671,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.end()
 
             dest = QtGui.QPixmap().fromImage(blurred)
-            
+
             painter = QPainter(self.pixmap())
             painter.setRenderHint(QPainter.HighQualityAntialiasing)
 
@@ -622,7 +739,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.history.sequence += 'l'
             self.history.line.append(((self.begin.x(), self.begin.y(),
                                        self.end.x(), self.end.y()),
-                                       pen, brush, pen_outline))
+                                      pen, brush, pen_outline))
             if pen_outline:
                 painter.setPen(pen_outline)
                 painter.drawLine(self.begin.x(), self.begin.y(),
@@ -630,38 +747,20 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 painter.setPen(pen)
             painter.drawLine(self.begin.x(), self.begin.y(),
                              self.end.x(), self.end.y())
-        
+
         self.begin = QtCore.QPoint()
         self.end = QtCore.QPoint()
         self.scene_px.setPixmap(self.pixmap())
         self.pixel_data = self.pixmap().toImage()
         self.update()
 
-    def wheelEvent(self, event):
-        if self.toolkit.isVisible():
-            self.toolkit.color_selected()
-            return
-        if self.toolkit.tools_config.isVisible():
-            self.toolkit.tools_config_outline.setWindowOpacity(0)
-            self.toolkit.tools_config.close()
-            self.toolkit.tools_config_outline.close()
-        else:
-            self.toolkit.tools_config_outline.setWindowOpacity(0)
-            self.toolkit.tools_config_outline.setStyleSheet("background: #131313;")
-            self.toolkit.tools_config_outline.show()
-            self.toolkit.tools_config_outline.setWindowOpacity(0.6)
-            self.toolkit.tools_config_outline.raise_()
-            self.toolkit.tools_config.setWindowOpacity(1)
-            self.toolkit.tools_config.show()
-            self.toolkit.tools_config.raise_()
-
-    def keyPressEvent(self, qKeyEvent):
-        if (qKeyEvent.modifiers() & Qt.ShiftModifier):
+    def keyPressEvent(self, event):
+        if event.modifiers() & Qt.ShiftModifier:
             self.quadratic = True
             return
         # is responsible for Ctrl-Z both in English and Cyrillic moonspeak
-        elif (qKeyEvent.modifiers() & QtCore.Qt.ControlModifier) \
-            and (qKeyEvent.nativeScanCode() == 52):
+        elif (event.modifiers() & QtCore.Qt.ControlModifier) \
+                and (event.nativeScanCode() == 52):
             if len(self.history.sequence) == 0:
                 return
 
@@ -669,8 +768,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
             painter = QPainter(self.pixmap())
             painter.setRenderHint(QPainter.HighQualityAntialiasing)
-            pen = QtGui.QPen(self.toolkit.pen_color, self.toolkit.pen_size)
-            painter.setPen(pen)
 
             pen_cnt = -1
             circl_cnt = -1
@@ -729,7 +826,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 elif item == 'b':
                     blur_cnt += 1
                     args = self.history.blur[blur_cnt]
-                    for i in range(6):
+                    for _ in range(6):
                         painter.drawPixmap(*args)
 
             last_item = self.history.sequence[-1]
@@ -749,46 +846,48 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.pixel_data = self.pixmap().toImage()
             return
 
-        elif qKeyEvent.key() == QtCore.Qt.Key_Return:
+        elif event.key() == QtCore.Qt.Key_Return:
             self.save_image(clip_only=True)
             self.closeScreen()
 
-        elif qKeyEvent.key() == QtCore.Qt.Key_Escape:
+        elif event.key() == QtCore.Qt.Key_Escape:
             self.closeScreen()
 
-        elif qKeyEvent.nativeScanCode() >= 10 and qKeyEvent.nativeScanCode() <= 16:
+        elif 10 <= event.nativeScanCode() <= 16:
             for key in self.toolkit.switches:
-                if qKeyEvent.nativeScanCode() == key[1]+10:
+                if event.nativeScanCode() == key[1] + 10:
                     self.toolkit.tool_sel(key[0])
                     return
 
-        elif qKeyEvent.nativeScanCode() == 28: #"T" key
+        elif event.nativeScanCode() == 28:  # "T" key
             if self.toolkit.isVisible():
                 self.toolkit.hide()
             else:
                 self.toolkit.show()
 
-        elif qKeyEvent.nativeScanCode() == 39: #"S" key
+        elif event.nativeScanCode() == 39:  # "S" key
             self.save_image()
             self.hideScreen()
 
-        elif qKeyEvent.nativeScanCode() == 38: #"A" key
+        elif event.nativeScanCode() == 38:  # "A" key
             cur_pos = QtGui.QCursor.pos()
             cur_window = []
             for window in self.active_windows:
                 x, y = window.x, window.y
-                w, h = x+window.width-1, y+window.height-1
+                w, h = x + window.width - 2, y + window.height - 2
                 # match window cords to mouse pointer
-                if cur_pos.x() >= x and cur_pos.y() >= y \
-                    and cur_pos.x() <= w and cur_pos.y() <= h:
+                if x <= cur_pos.x() <= w and y <= cur_pos.y() <= h:
                     cur_window = [x, y, w, h]
 
-            x, y, w, h = cur_window
+            try:
+                x, y, w, h = cur_window
+            except ValueError:
+                return
             self.cords = QtCore.QRect(QtCore.QPoint(x, y),
                                       QtCore.QPoint(w, h))
-            self.scene_sel.setRect(x+0.4, y+0.4,
-                                   w-x, h-y)
-        elif qKeyEvent.nativeScanCode() == 52: #"Z"
+            self.scene_sel.setRect(x + 0.4, y + 0.4,
+                                   w - x, h - y)
+        elif event.nativeScanCode() == 52:  # "Z"
             if self.view.isVisible():
                 self.pixel_info.hide()
                 self.view.hide()
@@ -797,11 +896,11 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 self.view.show()
         self.update()
 
-    def keyReleaseEvent(self, qKeyEvent):
+    def keyReleaseEvent(self, _):
         self.quadratic = False
 
     def crop(self, image):
-        rectwidth, rectheight, rectx, recty = (self.sel_rect.width(), 
+        rectwidth, rectheight, rectx, recty = (self.sel_rect.width(),
                                                self.sel_rect.height(),
                                                self.sel_rect.x(),
                                                self.sel_rect.y())
@@ -813,7 +912,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             rectheight = abs(rectheight)
         rectwidth += 1
         rectheight += 1
-        image = image.copy(rectx, recty, (rectwidth), (rectheight))
+        image = image.copy(rectx, recty, rectwidth, rectheight)
         return image
 
     def save_image(self, from_dialog=None, clip_only=False, push=True):
@@ -848,8 +947,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
     def upload_image(self):
         service = self.config.parse['config']['canvas']['upload_service']
-        del_hash = None
-
         args = [self.config, self.filepath, True]
 
         if service == 'Imgur':
@@ -859,16 +956,46 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         else:
             self.worker = Worker(self.img_toolkit.uguu_upload, args, 'uguu.se')
 
+        self.save_image(push=False)
+
+        tc_vis = self.toolkit.tools_config.isVisible()
+        self.toolkit.hide()
+        if tc_vis:
+            self.toolkit.tools_config.hide()
+
+        if self.config.parse['config']['canvas']['upload_confirmation'] == 0:
+            self.confirmation_win = ConfirmationWindow(self, service, self.filepath)
+            self.confirmation_win.show()
+
+            result = self.confirmation_win.result
+            self.confirmation_win.deleteLater()
+            self.confirmation_win.close()
+            self.confirmation_win = None
+
+            if result:
+                self.config.change_config('canvas', 'upload_confirmation', int(result[1]))
+
+                if not result[0]:
+                    self.toolkit.show()
+                    if tc_vis:
+                        self.toolkit.tools_config.show()
+                    os.remove(self.filepath)
+                    return
+            else:
+                self.toolkit.show()
+                if tc_vis:
+                    self.toolkit.tools_config.show()
+                os.remove(self.filepath)
+                return
+
+        self.hide()
+
         self.thread = QtCore.QThread()
         self.worker.finished.connect(self.get_ret_val)
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
 
-        self.save_image(push=False)
-
         self.thread.start()
-        self.toolkit.hide()
-        self.hide()
 
     def get_ret_val(self, response):
         if response:
@@ -898,13 +1025,13 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         thumb = QtGui.QImage(get_file)
         thumb = thumb.scaled(100, 100, Qt.KeepAspectRatioByExpanding,
-                                       Qt.SmoothTransformation)
+                             Qt.SmoothTransformation)
         if thumb.width() > 100:
-            rect = QtCore.QRect( 
-                (thumb.width() - 100) / 2, 
-                (thumb.height() - 100) / 2, 
-                100, 
-                100, 
+            rect = QtCore.QRect(
+                (thumb.width() - 100) // 2,
+                (thumb.height() - 100) // 2,
+                100,
+                100,
             )
             thumb = thumb.copy(rect)
 
@@ -912,7 +1039,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if not os.path.isdir(self.hist_dir):
             os.mkdir(self.hist_dir)
         if not os.path.isfile(self.hist):
-            with open(self.hist, 'w') as file:
+            with open(self.hist, 'w'):
                 pass
         else:
             with open(self.hist, 'r') as file:
@@ -922,20 +1049,20 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         if curr_date in data:
             from time import time_ns
-            curr_date += ('-'+str(time_ns()))
+            curr_date += ('-' + str(time_ns()))
 
-        thumb_name = os.path.join(self.hist_dir, 'thumb_'+curr_date+'.png')
+        thumb_name = os.path.join(self.hist_dir, 'thumb_' + curr_date + '.png')
         thumb.save(thumb_name)
 
         if type_ != 'Save':
-            type_ = "Upload — "+type_
+            type_ = "Upload — " + type_
 
         data[curr_date] = {
-                            "Type":type_,
-                            "URL":response,
-                            "Path":get_file,
-                            "Thumb":thumb_name
-                            }
+            "Type": type_,
+            "URL": response,
+            "Path": get_file,
+            "Thumb": thumb_name
+        }
         if delete_hash:
             data[curr_date]['del_hash'] = delete_hash
 

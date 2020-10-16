@@ -1,9 +1,6 @@
 #!/usr/bin/python3
-from datetime import datetime
-import mss, mss.tools
 import json
 import uuid
-import re
 import os
 
 import requests
@@ -12,10 +9,12 @@ from Xlib.display import Display
 from Xlib import X
 from time import sleep
 
+
 class NoLinkException(Exception):
     pass
 
-class ImageToolkit():
+
+class ImageToolkit:
 
     def __init__(self, app, config):
         self.app = app
@@ -41,11 +40,11 @@ class ImageToolkit():
 
     def get_name(self, ext):
         name = str(uuid.uuid4())[:14].replace('-', '')
-        if len(ext)>1:
+        if len(ext) > 1:
             name = name+'.'+ext[-1]
         return name
 
-    def catbox_upload(self, config, filepath, randname=False, parent=False):
+    def catbox_upload(self, config, filepath, randname=False, parent=None):
         link = "https://catbox.moe/user/api.php"
 
         name = os.path.split(filepath)[1]
@@ -83,8 +82,7 @@ class ImageToolkit():
             parent.emit([text])
         return response.text
 
-
-    def uguu_upload(self, config, filepath, randname=False, parent=False):
+    def uguu_upload(self, config, filepath, randname=False, parent=None):
         link = "https://uguu.se/api.php?d=upload-tool"
 
         name = os.path.split(filepath)[1]
@@ -120,8 +118,7 @@ class ImageToolkit():
             parent.emit([text])
         return response.text
 
-
-    def imgur_upload(self, config, filepath, randname=False, parent=False):
+    def imgur_upload(self, config, filepath, randname=False, parent=None):
         imgur_id = config.parse['config']['imgur']['client_id']
         imgur_url = config.parse['config']['imgur']['link']
         headers = {

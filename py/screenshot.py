@@ -1,9 +1,8 @@
 import mss, mss.tools
 from io import BytesIO
-from datetime import datetime
-from os.path import join
 
-class ScreenshotCLI():
+
+class ScreenshotCLI:
 
     def shot(self, mon=-1):
         sct = mss.mss()
@@ -14,10 +13,10 @@ class ScreenshotCLI():
         img = BytesIO(raw_bytes)
         return img
 
-    def save(self, image : BytesIO, path : str):
+    def save(self, image: BytesIO, path: str):
         try:
             with open(path, 'wb') as file:
                 file.write(image.getvalue())
         except PermissionError as e:
-            print(f"Could not write to '{path}': {e}")
+            print("Could not write to '%s': %s" % (path, e))
             return 1

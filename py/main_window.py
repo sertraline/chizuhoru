@@ -1,14 +1,14 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QStylePainter, QStyleOption, QStyleOptionTab, QCheckBox, QHBoxLayout
+from PyQt5 import QtGui, QtWidgets
+from PyQt5.QtWidgets import QStylePainter, QStyleOptionTab, QCheckBox, QHBoxLayout
 from PyQt5.QtWidgets import QVBoxLayout, QTabBar, QStyle, QLabel, QLineEdit, QFrame, QTabWidget
 from PyQt5.QtWidgets import QPushButton, QComboBox
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtCore import Qt
 from PyQt5 import QtCore
 import os
 
 from datetime import datetime
-from time import sleep
 import json
+
 
 class Worker(QtCore.QObject):
     finished = QtCore.pyqtSignal(list)
@@ -34,6 +34,7 @@ class Worker(QtCore.QObject):
             ret_val = self.fn(*self.args)
             self.finished.emit([self.args[1], ret_val, None])
 
+
 class Help(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -41,13 +42,13 @@ class Help(QtWidgets.QWidget):
 
         self.setGeometry(0, 0, 400, 500)
         self.setWindowTitle("Chizuhoru")
-        self.move(self.p.pos().x()+150, self.p.pos().y()-100)
-        self.initLayout()
+        self.move(self.p.pos().x() + 150, self.p.pos().y() - 100)
+        self.init_layout()
         self.setWindowTitle("Available patterns")
         self.setWindowIcon(self.p.parent.chz_ico)
         self.show()
 
-    def initLayout(self):
+    def init_layout(self):
         qv = QtWidgets.QVBoxLayout()
 
         tips = {
@@ -96,6 +97,7 @@ class Help(QtWidgets.QWidget):
         scroll_wrap.addWidget(scroll)
         self.setLayout(scroll_wrap)
 
+
 class TabBar(QtWidgets.QTabBar):
     def tabSizeHint(self, index):
         s = QTabBar.tabSizeHint(self, index)
@@ -124,26 +126,29 @@ class TabBar(QtWidgets.QTabBar):
             painter.drawControl(QStyle.CE_TabBarTabLabel, opt)
             painter.restore()
 
+
 class TabWidget(QtWidgets.QTabWidget):
     def __init__(self, *args, **kwargs):
         QTabWidget.__init__(self, *args, **kwargs)
         self.setTabBar(TabBar(self))
         self.setTabPosition(QtWidgets.QTabWidget.West)
 
+
 class ProxyStyle(QtWidgets.QProxyStyle):
     def drawControl(self, element, opt, painter, widget):
         if element == QStyle.CE_TabBarTabLabel:
-            ic = self.pixelMetric(QStyle.PM_TabBarIconSize)
+            self.pixelMetric(QStyle.PM_TabBarIconSize)
             r = QtCore.QRect(opt.rect)
-            w =  0 if opt.icon.isNull() else opt.rect.width() + self.pixelMetric(QStyle.PM_TabBarIconSize)
+            w = 0 if opt.icon.isNull() else opt.rect.width() + self.pixelMetric(QStyle.PM_TabBarIconSize)
             r.setHeight(opt.fontMetrics.width(opt.text) + w)
             r.moveBottom(opt.rect.bottom())
             opt.rect = r
         QtWidgets.QProxyStyle.drawControl(self, element, opt, painter, widget)
 
+
 class HistoryItem(QtWidgets.QWidget):
 
-    def __init__ (self, parent):
+    def __init__(self, parent):
         super().__init__()
 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -180,7 +185,7 @@ class HistoryItem(QtWidgets.QWidget):
         w.setFixedHeight(110)
         framewrap = QVBoxLayout()
         framewrap.addWidget(w)
-        
+
         self.setLayout(framewrap)
 
     def show_context_menu(self, event):
@@ -210,19 +215,20 @@ class HistoryItem(QtWidgets.QWidget):
         if not fpath:
             fpath = self.info.text()
         os.popen(
-        f"""
-        dbus-send --session --print-reply \
-        --dest=org.freedesktop.FileManager1 \
-        --type=method_call /org/freedesktop/FileManager1 \
-        org.freedesktop.FileManager1.ShowItems \
-        array:string:"file://{fpath}" string:\"\"
-        """)
+            """
+            dbus-send --session --print-reply \
+            --dest=org.freedesktop.FileManager1 \
+            --type=method_call /org/freedesktop/FileManager1 \
+            org.freedesktop.FileManager1.ShowItems \
+            array:string:"file://%s" string:\"\"
+            """ % fpath)
 
     def copy_url(self):
         self.parent.app.clipboard().setText(self.info.text())
 
-    def set_icon(self, imagePath):
-        self.thumb.setPixmap(QtGui.QPixmap(imagePath))
+    def set_icon(self, image_path):
+        self.thumb.setPixmap(QtGui.QPixmap(image_path))
+
 
 class MainWindow(QtWidgets.QWidget):
 
@@ -238,10 +244,10 @@ class MainWindow(QtWidgets.QWidget):
         __screen_geo = QtWidgets.QApplication.desktop().screenGeometry(__screen)
 
         self.screen = __screen
-        self.height, self.width, self.left, self.top = __screen_geo.height(), \
-                                                       __screen_geo.width(), \
-                                                       __screen_geo.left(), \
-                                                       __screen_geo.top()
+        self.height, self.width, self.left, self.top = (__screen_geo.height(),
+                                                        __screen_geo.width(),
+                                                        __screen_geo.left(),
+                                                        __screen_geo.top())
         self.setGeometry((self.left + (self.width / 2 - 300)),
                          (self.top + (self.height / 2 - 175)),
                          600, 350)
@@ -258,28 +264,27 @@ class MainWindow(QtWidgets.QWidget):
         self.mime_db = QtCore.QMimeDatabase()
         self.thread = None
 
-        self.initLayout()
-    
-    def initLayout(self):
+        self.init_layout()
+
+    def init_layout(self):
         self.setStyle(ProxyStyle())
         self.layout = QtWidgets.QVBoxLayout(self)
         self.tabs = TabWidget()
-        
-        self.tab_capture, self.tab_upload, \
-            self.tab_settings, self.tab_history = [
-            QtWidgets.QWidget() for i in range(4)
+
+        self.tab_capture, self.tab_upload, self.tab_settings, self.tab_history = [
+            QtWidgets.QWidget() for _ in range(4)
         ]
 
-        self.tabs.addTab(self.tab_capture,"Capture")
-        self.tabs.addTab(self.tab_upload,"Upload")
-        self.tabs.addTab(self.tab_history,"History")
-        self.tabs.addTab(self.tab_settings,"Settings")
+        self.tabs.addTab(self.tab_capture, "Capture")
+        self.tabs.addTab(self.tab_upload, "Upload")
+        self.tabs.addTab(self.tab_history, "History")
+        self.tabs.addTab(self.tab_settings, "Settings")
 
-        self.initTabCapture()
-        self.initTabUpload()
-        self.initTabHistory()
-        self.initTabSettings()
-        
+        self.init_tab_capture()
+        self.init_tab_upload()
+        self.init_tab_history()
+        self.init_tab_settings()
+
         self.tabs.setCurrentIndex(1)
         self.tabs.currentChanged.connect(self.capture_init)
 
@@ -288,7 +293,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # help window
         self.helpw = None
-        
+
         self.setLayout(self.layout)
 
     @QtCore.pyqtSlot()
@@ -302,10 +307,10 @@ class MainWindow(QtWidgets.QWidget):
             self.close()
             self.parent.initCaptureCheck()
 
-    def initTabCapture(self):
+    def init_tab_capture(self):
         pass
-    
-    def initTabUpload(self):
+
+    def init_tab_upload(self):
         main_v = QtWidgets.QVBoxLayout()
 
         inner_q_up = QFrame()
@@ -341,6 +346,7 @@ class MainWindow(QtWidgets.QWidget):
         in_hb_2 = QHBoxLayout()
         in_hb_left = QVBoxLayout()
         in_hb_left_q = QFrame()
+        in_hb_left_q.setStyleSheet('QCheckBox { margin: 2px; }')
 
         copy_h = QHBoxLayout()
         self.copy_check = QCheckBox()
@@ -405,7 +411,7 @@ class MainWindow(QtWidgets.QWidget):
         self.result_f = QtWidgets.QTextEdit("")
         self.result_f.setFixedHeight(50)
         self.result_f.setReadOnly(True)
-        self.result_f.setTextInteractionFlags(self.result_f.textInteractionFlags() \
+        self.result_f.setTextInteractionFlags(self.result_f.textInteractionFlags()
                                               | Qt.TextSelectableByKeyboard)
         if self.parent.last_url:
             self.result_f.setText(self.parent.last_url)
@@ -425,7 +431,7 @@ class MainWindow(QtWidgets.QWidget):
         inner_v_down = QVBoxLayout()
         self.out = QtWidgets.QTextEdit("Idle")
         self.out.setReadOnly(True)
-        self.out.setTextInteractionFlags(self.out.textInteractionFlags() \
+        self.out.setTextInteractionFlags(self.out.textInteractionFlags()
                                          | Qt.TextSelectableByKeyboard)
         self.out.setStyleSheet(("QTextEdit { background-color: black; color: white; "
                                 "border: 0; padding-left: 4px; padding-top: 4px;"
@@ -441,7 +447,7 @@ class MainWindow(QtWidgets.QWidget):
         main_v.addWidget(inner_q_down, 70)
         self.tab_upload.setLayout(main_v)
 
-    def initTabHistory(self):
+    def init_tab_history(self):
         main_wrap = QVBoxLayout()
 
         data = ''
@@ -452,7 +458,7 @@ class MainWindow(QtWidgets.QWidget):
             with open(self.hist, 'r') as file:
                 data = file.read()
         else:
-            with open(self.hist, 'w') as file:
+            with open(self.hist, 'w'):
                 pass
 
         self.history_list = QtWidgets.QListWidget(self)
@@ -493,10 +499,10 @@ class MainWindow(QtWidgets.QWidget):
             self.history_list.setItemWidget(widget, hitem)
 
         main_wrap.addWidget(self.history_list)
-        #self.history_list.sortItems(Qt.DescendingOrder)
+        # self.history_list.sortItems(Qt.DescendingOrder)
         self.tab_history.setLayout(main_wrap)
 
-    def initTabSettings(self):
+    def init_tab_settings(self):
         main_wrap = QVBoxLayout()
 
         dir_lab = QLabel("Save directory: ")
@@ -513,6 +519,7 @@ class MainWindow(QtWidgets.QWidget):
 
         general_frame = QFrame()
         general_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
+        general_frame.setStyleSheet('QCheckBox { margin: 2px; }')
 
         general_wrap = QVBoxLayout()
 
@@ -560,6 +567,7 @@ class MainWindow(QtWidgets.QWidget):
         general_frame.setLayout(general_wrap)
 
         canvas_frame = QFrame()
+        canvas_frame.setStyleSheet('QCheckBox { margin: 2px; }')
         canvas_wrap = QVBoxLayout()
         canvas_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
 
@@ -610,6 +618,7 @@ class MainWindow(QtWidgets.QWidget):
         clear_btn.clicked.connect(self.clear_history_list)
         history_wrap.addWidget(clear_btn)
         history_frame.setLayout(history_wrap)
+        history_frame.setStyleSheet('QCheckBox { margin: 2px; }')
         history_frame.setFrameStyle(QFrame().StyledPanel | QFrame().Sunken)
 
         bot_wrap = QVBoxLayout()
@@ -627,7 +636,7 @@ class MainWindow(QtWidgets.QWidget):
         bot_wrap.addStretch(1)
         bot_wrap.addWidget(lab_2)
         bot_wrap.addWidget(history_frame)
-        
+
         main_wrap.addItem(bot_wrap)
 
         scroll_frame = QFrame()
@@ -723,25 +732,25 @@ class MainWindow(QtWidgets.QWidget):
         curr_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         filetype = self.mime_db.mimeTypeForFile(get_file)
-        if not 'image' in filetype.iconName():
+        if 'image' not in filetype.iconName():
             thumb = QtGui.QIcon.fromTheme(filetype.iconName())
             thumb = thumb.pixmap(thumb.actualSize(QtCore.QSize(100, 100)))
         else:
             thumb = QtGui.QImage(get_file)
             thumb = thumb.scaled(100, 100, Qt.KeepAspectRatioByExpanding,
-                                        Qt.SmoothTransformation)
+                                 Qt.SmoothTransformation)
             if thumb.width() > 100:
-                rect = QtCore.QRect( 
-                    (thumb.width() - 100) / 2, 
-                    (thumb.height() - 100) / 2, 
-                    100, 
-                    100, 
+                rect = QtCore.QRect(
+                    (thumb.width() - 100) // 2,
+                    (thumb.height() - 100) // 2,
+                    100,
+                    100,
                 )
                 thumb = thumb.copy(rect)
 
         data = {}
         if not os.path.isfile(self.hist):
-            with open(self.hist, 'w') as file:
+            with open(self.hist, 'w'):
                 pass
         else:
             with open(self.hist, 'r') as file:
@@ -751,17 +760,17 @@ class MainWindow(QtWidgets.QWidget):
 
         if curr_date in data:
             from time import time_ns
-            curr_date += ('-'+str(time_ns()))
+            curr_date += ('-' + str(time_ns()))
 
-        thumb_name = os.path.join(self.hist_dir, 'thumb_'+curr_date+'.png')
+        thumb_name = os.path.join(self.hist_dir, 'thumb_' + curr_date + '.png')
         thumb.save(thumb_name)
 
         data[curr_date] = {
-                            "Type":"Upload — "+type_,
-                            "URL":response,
-                            "Path":get_file,
-                            "Thumb":thumb_name
-                            }
+            "Type": "Upload — " + type_,
+            "URL": response,
+            "Path": get_file,
+            "Thumb": thumb_name
+        }
         if delete_hash:
             data[curr_date]['del_hash'] = delete_hash
 
@@ -772,7 +781,7 @@ class MainWindow(QtWidgets.QWidget):
         if delete_hash:
             item.del_hash = delete_hash
         item.date.setText(curr_date)
-        item.type.setText("Upload — "+type_)
+        item.type.setText("Upload — " + type_)
         item.info.setText(response)
         item.set_info_url()
 
@@ -812,7 +821,7 @@ class MainWindow(QtWidgets.QWidget):
         for file in os.listdir(self.hist_dir):
             if file.startswith('thumb_') and file.endswith('.png'):
                 os.remove(os.path.join(self.hist_dir, file))
-        with open(self.hist, 'w') as file:
+        with open(self.hist, 'w'):
             pass
 
     def browse_directories(self):
@@ -823,13 +832,13 @@ class MainWindow(QtWidgets.QWidget):
         dirpath = fd if fd else None
         if dirpath and os.path.isdir(dirpath):
             self.dirline.setText(dirpath)
-            self.config.changeConfig('default_dir', value=dirpath)
+            self.config.change_config('default_dir', value=dirpath)
 
     def call_file_dialog(self):
         qdialog_filter = ('All files (*.*)'
-                             ';;Pictures (*.png *.jpg *.jpeg *.bmp *.gif *.ico *.tiff)'
-                             ';;Videos (*.mp4 *.webm *.mkv *.mov)'
-                             ';;Text (*.txt)'
+                          ';;Pictures (*.png *.jpg *.jpeg *.bmp *.gif *.ico *.tiff)'
+                          ';;Videos (*.mp4 *.webm *.mkv *.mov)'
+                          ';;Text (*.txt)'
                           )
         if self.up_comb.currentData(self.up_comb.currentIndex()) == 'Imgur':
             qdialog_filter = 'Pictures (*.png *.jpg *.jpeg *.bmp *.gif *.ico *.tiff)'
@@ -887,26 +896,26 @@ class MainWindow(QtWidgets.QWidget):
             self.app.clipboard().setText(value)
 
     def update_upload_copyclip_state(self):
-        self.config.changeConfig('upload', 'clipboard_state',
-                                            int(self.copy_check.isChecked()))
+        self.config.change_config('upload', 'clipboard_state',
+                                  int(self.copy_check.isChecked()))
 
     def update_upload_randname_state(self):
-        self.config.changeConfig('upload', 'random_fname_state',
-                                            int(self.name_check.isChecked()))
+        self.config.change_config('upload', 'random_fname_state',
+                                  int(self.name_check.isChecked()))
 
     def update_last_serv(self):
-        self.config.changeConfig('upload', 'last_service', self.up_comb.currentText())
+        self.config.change_config('upload', 'last_service', self.up_comb.currentText())
 
     def update_delay(self):
-        self.config.changeConfig('default_delay', value=self.del_check.value())
+        self.config.change_config('default_delay', value=self.del_check.value())
 
     def update_file_format(self):
         new_format = self.name_pattern.text()
-        self.config.changeConfig('filename_format', value=new_format)
+        self.config.change_config('filename_format', value=new_format)
 
     def update_canvas_upload(self):
         new = self.set_up_comb.currentText()
-        self.config.changeConfig('canvas', 'upload_service', new)
+        self.config.change_config('canvas', 'upload_service', new)
 
     def update_canvas_save(self):
         new = self.set_save.currentText()
@@ -914,12 +923,12 @@ class MainWindow(QtWidgets.QWidget):
             new = 'dialog'
         else:
             new = 'dir'
-        self.config.changeConfig('canvas', 'save_action', new)
+        self.config.change_config('canvas', 'save_action', new)
 
     def update_img_clip(self):
-        self.config.changeConfig('canvas', 'img_clip',
-                                            int(self.img_check.isChecked()))
+        self.config.change_config('canvas', 'img_clip',
+                                  int(self.img_check.isChecked()))
 
     def update_ico(self):
         new_ico = self.ico_comb.currentText()
-        self.config.changeConfig('icon', value=new_ico.lower())
+        self.config.change_config('icon', value=new_ico.lower())

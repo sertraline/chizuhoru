@@ -1,6 +1,5 @@
-from PyQt5.QtGui import QPainter, QImage, QPalette, QBrush
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import QSize, Qt
+from PyQt5 import QtGui, QtWidgets
+from PyQt5 import QtCore, QtNetwork
 from time import sleep
 import os
 import gc
@@ -9,8 +8,10 @@ from screen_window import ScreenWindow
 from image_toolkit import ImageToolkit
 from main_window import MainWindow
 
-import sys, signal, socket
-from PyQt5 import QtCore, QtNetwork
+import sys
+import signal
+import socket
+
 
 class SignalWakeupHandler(QtNetwork.QAbstractSocket):
 
@@ -28,19 +29,20 @@ class SignalWakeupHandler(QtNetwork.QAbstractSocket):
         self.setSocketDescriptor(self.rsock.fileno())
         self.wsock.setblocking(False)
         self.old_fd = signal.set_wakeup_fd(self.wsock.fileno())
-        self.readyRead.connect(lambda : None)
+        self.readyRead.connect(lambda: None)
         # Second handler does the real handling
-        self.readyRead.connect(self._readSignal)
+        self.readyRead.connect(self._read_signal)
 
     def __del__(self):
         if self.old_fd is not None and signal and signal.set_wakeup_fd:
             signal.set_wakeup_fd(self.old_fd)
 
-    def _readSignal(self):
+    def _read_signal(self):
         data = self.readData(1)
         self.signalReceived.emit(data[0])
 
     signalReceived = QtCore.pyqtSignal(int)
+
 
 class OnclickOverlay(QtWidgets.QWidget):
     def __init__(self, parent):
@@ -53,15 +55,16 @@ class OnclickOverlay(QtWidgets.QWidget):
         self.setGeometry(0, 0, __screen_geo.width(), __screen_geo.height())
         self.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
 
-        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
-                            | QtCore.Qt.FramelessWindowHint \
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint
+                            | QtCore.Qt.FramelessWindowHint
                             | QtCore.Qt.X11BypassWindowManagerHint)
         self.move(__screen_geo.left(), __screen_geo.top())
         self.setWindowOpacity(0)
 
     def mousePressEvent(self, event):
-        self.parent.initCaptureCheck(False, 0)
+        self.parent.init_capture_check(False, 0)
         self.close()
+
 
 class Tray(QtWidgets.QWidget):
     trigger = QtCore.pyqtSignal()
@@ -77,7 +80,7 @@ class Tray(QtWidgets.QWidget):
 
         SignalWakeupHandler(self.app, self)
         
-        signal.signal(signal.SIGCONT, lambda x,_: self.initCaptureCheck(False, 0))
+        signal.signal(signal.SIGCONT, lambda x, _: self.init_capture_check(False, 0))
 
         self.chz_ico = QtGui.QIcon(os.path.join(
                             sys.path[0], 'img', 'ico_colored.png')
@@ -91,16 +94,16 @@ class Tray(QtWidgets.QWidget):
         self.last_out = ''
         self.last_url = ''
 
-        self.setGeometry(0,0,0,0)
-        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint \
-                            | QtCore.Qt.FramelessWindowHint \
+        self.setGeometry(0, 0, 0, 0)
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint
+                            | QtCore.Qt.FramelessWindowHint
                             | QtCore.Qt.X11BypassWindowManagerHint)
-        self.trigger.connect(self.initCapture)
-        self.initTray()
-        self.initCapture()
-        #self.initScreen()
+        self.trigger.connect(self.init_capture)
+        self.init_tray()
+        self.init_capture()
+        # self.init_screen()
 
-    def initTray(self):
+    def init_tray(self):
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
         self.tray_icon.setIcon(self.chz_ico_tray)
         self.app.setApplicationName('Chizuhoru')
@@ -110,18 +113,18 @@ class Tray(QtWidgets.QWidget):
         show_action = QtWidgets.QAction("Show", self)
         quit_action = QtWidgets.QAction("Exit", self)
 
-        capture_action.triggered.connect(self.initCaptureCheck)
-        show_action.triggered.connect(self.initMainCheck)
+        capture_action.triggered.connect(self.init_capture_check)
+        show_action.triggered.connect(self.init_main_check)
         quit_action.triggered.connect(self.close)
 
         tray_menu = QtWidgets.QMenu()
         capture_menu = QtWidgets.QMenu("Delay", tray_menu)
         _5_sec = QtWidgets.QAction("5 sec.", capture_menu)
-        _5_sec.triggered.connect(lambda _: self.initCaptureCheck(delay=5))
+        _5_sec.triggered.connect(lambda _: self.init_capture_check(delay=5))
         _10_sec = QtWidgets.QAction("10 sec.", capture_menu)
-        _10_sec.triggered.connect(lambda _: self.initCaptureCheck(delay=10))
+        _10_sec.triggered.connect(lambda _: self.init_capture_check(delay=10))
         _15_sec = QtWidgets.QAction("15 sec.", capture_menu)
-        _15_sec.triggered.connect(lambda _: self.initCaptureCheck(delay=15))
+        _15_sec.triggered.connect(lambda _: self.init_capture_check(delay=15))
         onclick = QtWidgets.QAction("On click", capture_menu)
         onclick.triggered.connect(self.invoke_onclick)
         capture_menu.addAction(_5_sec)
@@ -145,10 +148,10 @@ class Tray(QtWidgets.QWidget):
 
     def tray_clicked(self, reason):
         if reason == 3:
-            self.initCaptureCheck(default_delay=False)
+            self.init_capture_check(default_delay=False)
 
     @QtCore.pyqtSlot()
-    def initCaptureCheck(self, default_delay=True, delay=0):
+    def init_capture_check(self, default_delay=True, delay=0):
         gc.collect()
         try:
             if self.window and self.window.isVisible():
@@ -161,25 +164,25 @@ class Tray(QtWidgets.QWidget):
                     sleep(delay)
                 elif default_delay:
                     sleep(self.config.parse["config"]["default_delay"])
-                self.initCapture()
+                self.init_capture()
         except RuntimeError:
             # C++ window destroyed
             if delay:
                 sleep(delay)
             elif default_delay:
                 sleep(self.config.parse["config"]["default_delay"])
-            self.initCapture()
+            self.init_capture()
 
-    def initMainCheck(self):
+    def init_main_check(self):
         gc.collect()
         if self.main_window and self.main_window.isVisible():
             print("Dialog already exists")
         elif self.main_window and self.main_window.was_hidden:
             self.main_window.show()
         else:
-            self.initScreen()
+            self.init_screen()
 
-    def initCapture(self):
+    def init_capture(self):
         try:
             del self.window
         except AttributeError:
@@ -190,7 +193,7 @@ class Tray(QtWidgets.QWidget):
         self.window.activateWindow()
         self.window.raise_()
 
-    def initScreen(self):
+    def init_screen(self):
         try:
             del self.main_window
         except AttributeError:

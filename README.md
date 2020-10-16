@@ -63,8 +63,8 @@ Where `PATH` must be replaced with actual path to this directory.
 
 |  Keys                                                  |  Description                          |
 |---                                                     |---                                    |
-| <kbd>T</kbd> / <kbd>Right Mouse Button</kbd>           | Show/hide main panel                  |
-| <kbd>Mouse wheel</kbd>                                 | Show/hide paint settings window       |
+| <kbd>T</kbd>                                           | Show/hide main panel                  |
+| <kbd>Right Mouse Button</kbd>                          | Show/hide paint settings window       |
 | <kbd>Esc</kbd>                                         | Cancel and close the window           |
 | <kbd>Enter</kbd>                                       | Copy image or selection to clipboard  |
 | <kbd>S</kbd>                                           | Save image or selection               |

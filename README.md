@@ -71,6 +71,7 @@ Where `PATH` must be replaced with actual path to this directory.
 | <kbd>A</kbd>                                           | Select window under the mouse pointer |
 | <kbd>Z</kbd>                                           | Toggle magnifier                      |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd>                         | Undo                                  |
+| <kbd>Hold shift while drawing</kbd>                    | Constraint key: ensure drawn shape has equal sides |
 | <kbd>1</kbd>                                           | Selection                             |
 | <kbd>2</kbd>                                           | Pen                                   |
 | <kbd>3</kbd>                                           | Circle                                |

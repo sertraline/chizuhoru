@@ -156,8 +156,8 @@ class ImageToolkit:
             parent.emit([text])
         try:
             jtext = json.loads(response.text)
-        except json.decoder.JSONDecodeError as e:
+            return jtext["data"]["link"], jtext["data"]["deletehash"]
+        except (json.decoder.JSONDecodeError, KeyError) as e:
             if parent:
                 parent.emit([str(e), None])
             return str(e), None
-        return jtext["data"]["link"], jtext["data"]["deletehash"]

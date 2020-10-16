@@ -305,7 +305,7 @@ class MainWindow(QtWidgets.QWidget):
             self.move(self.height, self.width)
             self.setVisible(False)
             self.close()
-            self.parent.initCaptureCheck()
+            self.parent.init_capture_check()
 
     def init_tab_capture(self):
         pass

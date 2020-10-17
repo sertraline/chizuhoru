@@ -340,7 +340,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     painter.setPen(pen)
                     painter.drawLine(line)
                     self.draw_text(painter, line.x1(), line.y1(),
-                                   int(line.length()), float('%02d' % line.angle()),
+                                   int(line.length()), float('%.2f' % line.angle()),
                                    offset=False)
                 else:
                     # switch 0: selection, switch 6: blur

@@ -40,6 +40,7 @@ class Config:
                                     "outline": 'disabled',
                                     "upload_service": "Imgur",
                                     "upload_confirmation": 0,
+                                    "magnifier": 1,
                                     "save_action": "dir",
                                     "img_clip": 1
                                 },

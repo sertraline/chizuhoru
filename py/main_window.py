@@ -10,6 +10,19 @@ from datetime import datetime
 import json
 
 
+class LabelBoundToCheckbox(QtWidgets.QLabel):
+    """
+    Toggle checkbox when its label is clicked
+    """
+
+    def __init__(self, checkbox, text):
+        super().__init__(text)
+        self.checkbox = checkbox
+
+    def mousePressEvent(self, ev: QtGui.QMouseEvent) -> None:
+        self.checkbox.click()
+
+
 class Worker(QtCore.QObject):
     finished = QtCore.pyqtSignal(list)
     console = QtCore.pyqtSignal(list)
@@ -22,6 +35,10 @@ class Worker(QtCore.QObject):
 
     @QtCore.pyqtSlot()
     def run(self):
+        """
+        Accepts one of the upload methods present in image_toolkit.
+        Emits returned values when finished.
+        """
         self.args.append(self.console)
         if self.type == 'Imgur':
             try:
@@ -99,6 +116,7 @@ class Help(QtWidgets.QWidget):
 
 
 class TabBar(QtWidgets.QTabBar):
+
     def tabSizeHint(self, index):
         s = QTabBar.tabSizeHint(self, index)
         s.transpose()
@@ -352,7 +370,7 @@ class MainWindow(QtWidgets.QWidget):
         self.copy_check = QCheckBox()
         self.copy_check.setChecked(bool(self.config.parse['config']['upload']['clipboard_state']))
         self.copy_check.stateChanged.connect(self.update_upload_copyclip_state)
-        copy_lab = QLabel("Copy link after upload")
+        copy_lab = LabelBoundToCheckbox(self.copy_check, "Copy link after upload")
         copy_h.addWidget(self.copy_check)
         copy_h.addWidget(copy_lab)
         copy_h.addStretch(1)
@@ -361,7 +379,7 @@ class MainWindow(QtWidgets.QWidget):
         self.name_check = QCheckBox()
         self.name_check.setChecked(bool(self.config.parse['config']['upload']['random_fname_state']))
         self.name_check.stateChanged.connect(self.update_upload_randname_state)
-        name_lab = QLabel("Send random filename")
+        name_lab = LabelBoundToCheckbox(self.name_check, "Send random filename")
         name_h.addWidget(self.name_check)
         name_h.addWidget(name_lab)
         name_h.addStretch(1)
@@ -600,16 +618,27 @@ class MainWindow(QtWidgets.QWidget):
         save_btn_wrap.addWidget(self.set_save)
 
         copy_img_wrap = QHBoxLayout()
-        img_clip_lab = QLabel("Copy image to clipboard on save")
         self.img_check = QCheckBox()
         self.img_check.setChecked(bool(self.config.parse['config']['canvas']['img_clip']))
         self.img_check.stateChanged.connect(self.update_img_clip)
+        img_clip_lab = LabelBoundToCheckbox(self.img_check, "Copy image to clipboard on save")
         copy_img_wrap.addWidget(self.img_check)
         copy_img_wrap.addWidget(img_clip_lab)
         copy_img_wrap.addStretch(1)
+
+        magn_wrap = QHBoxLayout()
+        self.magn_defaults = QCheckBox()
+        self.magn_defaults.setChecked(bool(self.config.parse['config']['canvas']['magnifier']))
+        self.magn_defaults.stateChanged.connect(self.update_magnifier_state)
+        magn_lab = LabelBoundToCheckbox(self.magn_defaults, "Show magnifier on startup")
+        magn_wrap.addWidget(self.magn_defaults)
+        magn_wrap.addWidget(magn_lab)
+        magn_wrap.addStretch(1)
+
         canvas_wrap.addItem(upload_wrap)
         canvas_wrap.addItem(save_btn_wrap)
         canvas_wrap.addItem(copy_img_wrap)
+        canvas_wrap.addItem(magn_wrap)
         canvas_frame.setLayout(canvas_wrap)
 
         history_frame = QFrame()
@@ -928,6 +957,10 @@ class MainWindow(QtWidgets.QWidget):
     def update_img_clip(self):
         self.config.change_config('canvas', 'img_clip',
                                   int(self.img_check.isChecked()))
+
+    def update_magnifier_state(self):
+        self.config.change_config('canvas', 'magnifier',
+                                  int(self.magn_defaults.isChecked()))
 
     def update_ico(self):
         new_ico = self.ico_comb.currentText()

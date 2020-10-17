@@ -529,6 +529,7 @@ class Toolkit(BaseLayer):
         filedial = QtWidgets.QFileDialog()
         filedial.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
 
+        self.parent.hide()
         tc_vis = self.tools_config.isVisible()
         if tc_vis:
             self.tools_config.hide()
@@ -543,6 +544,8 @@ class Toolkit(BaseLayer):
                 filepath += '.png'
             self.parent.save_image(filepath)
         else:
+            self.parent.showFullScreen()
+            self.parent.activateWindow()
             self.show()
             if tc_vis:
                 self.tools_config.show()

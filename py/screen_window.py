@@ -12,6 +12,7 @@ import gc
 
 import qt_toolkit
 from main_window import HistoryItem
+from main_window import LabelBoundToCheckbox
 
 import ctypes
 import sip
@@ -56,17 +57,19 @@ class ConfirmationWindow(QtWidgets.QDialog):
 
         self.setGeometry(0, 0, 500, 350)
         self.setWindowTitle("Upload confirmation")
-        self.move((self.p.width // 2) - 250, (self.p.height // 2) - 175)
+        self.move((self.p.width // 2) - 250,
+                  (self.p.height // 2) - 175)
         self.setWindowIcon(self.p.parent.chz_ico)
 
         self.setModal(True)
 
         self.init_layout()
         self.raise_()
+        self.cancel.setFocus()
         self.exec()
-        self.activateWindow()
 
     def init_layout(self):
+        hb = QtWidgets.QHBoxLayout()
         vb = QtWidgets.QVBoxLayout()
 
         img_frame = QtWidgets.QFrame()
@@ -75,14 +78,13 @@ class ConfirmationWindow(QtWidgets.QDialog):
 
         img_layout = QtWidgets.QHBoxLayout()
         img_container = QtWidgets.QLabel()
-        img = QtGui.QPixmap(self.image)
 
         transformation = Qt.SmoothTransformation
-        if img.size().width() < 100 or img.size().height() < 100:
+        if self.image.size().width() < 100 or self.image.size().height() < 100:
             transformation = Qt.FastTransformation
-        img = img.scaled(460, 280, Qt.KeepAspectRatio,
-                         transformation)
-        img_container.setPixmap(img)
+        self.image = self.image.scaled(460, 280, Qt.KeepAspectRatio,
+                                       transformation)
+        img_container.setPixmap(self.image)
         img_layout.addWidget(img_container)
         img_layout.setAlignment(Qt.AlignCenter)
         img_frame.setLayout(img_layout)
@@ -93,10 +95,12 @@ class ConfirmationWindow(QtWidgets.QDialog):
         vb.addWidget(service_info)
 
         setting_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel('Don\'t ask next time')
+        self.ask_box = QtWidgets.QCheckBox()
+        self.ask_box.setStyleSheet('QCheckBox { margin: 2px; }')
+        title = LabelBoundToCheckbox(self.ask_box,
+                                     'Don\'t ask next time')
         title.setFixedWidth(200)
-        self.setting_box = QtWidgets.QCheckBox()
-        setting_layout.addWidget(self.setting_box)
+        setting_layout.addWidget(self.ask_box)
         setting_layout.addWidget(title)
         setting_layout.setAlignment(Qt.AlignLeft)
 
@@ -107,23 +111,26 @@ class ConfirmationWindow(QtWidgets.QDialog):
         confirm = QtWidgets.QPushButton('Upload')
         confirm.clicked.connect(self.confirmed)
         confirm.setFixedWidth(120)
-        cancel = QtWidgets.QPushButton('Cancel')
-        cancel.clicked.connect(self.cancelled)
-        cancel.setFixedWidth(120)
+        self.cancel = QtWidgets.QPushButton('Cancel')
+        self.cancel.clicked.connect(self.cancelled)
+        self.cancel.setFixedWidth(120)
 
         hb_buttons.addItem(setting_layout)
+        hb_buttons.addSpacing(1)
         hb_buttons.addWidget(confirm)
-        hb_buttons.addWidget(cancel)
+        hb_buttons.addWidget(self.cancel)
 
         vb.addItem(hb_buttons)
-        self.setLayout(vb)
+        hb.addItem(vb)
+        hb.setAlignment(Qt.AlignCenter)
+        self.setLayout(hb)
 
     def confirmed(self):
-        self.result = [1, self.setting_box.isChecked()]
+        self.result = [1, self.ask_box.isChecked()]
         self.close()
 
     def cancelled(self):
-        self.result = [0, self.setting_box.isChecked()]
+        self.result = [0, self.ask_box.isChecked()]
         self.close()
 
 
@@ -220,12 +227,13 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         x.setFlag(QtWidgets.QGraphicsItem.ItemIgnoresTransformations)
 
         self.view.move(self.width - 200, 40)
+
         self.pixel_info.move(self.view.pos().x() + 6, self.view.pos().y() + 6)
         self.pixel_info.setStyleSheet('background-color: rgba(0, 0, 0, 80);')
         self.pixel_info_label.setStyleSheet("""
             background-color: transparent; color: white; margin:0; padding:0;
         """)
-        self.pixel_info.show()
+
         self.view.setSceneRect(0, 0, 140, 140)
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -253,7 +261,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.pen_point_list = []
         self.pen_cords_track_list = []
 
-        self.view.show()
+        if not (self.config.parse['config']['canvas']['magnifier']):
+            self.view.hide()
+            self.pixel_info.hide()
+
         _pen = QtGui.QPen(QtGui.QColor(103, 150, 188, 180), 0.6, Qt.SolidLine, Qt.SquareCap)
         _brush = QtGui.QBrush(self.toolkit.brush_selection_color)
         self.scene_sel = self.scene.addRect(QtCore.QRectF(0, 0, 0, 0), _pen, _brush)
@@ -288,6 +299,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
             # if paint tool is selected and LMB clicked, process event
             if self.paint_allowed:
+                if pen_outline:
+                    painter.setPen(pen_outline)
                 # switch 1: pen drawing, switch 5: free drawing
                 if self.toolkit.switch == 5:
                     if not self.pen_point_list:
@@ -297,29 +310,46 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                         return
 
                     if pen_outline:
-                        painter.setPen(pen_outline)
                         painter.drawPath(self.path)
-                        painter.setPen(pen)
+                    painter.setPen(pen)
                     painter.drawPath(self.path)
                 elif self.toolkit.switch == 2:
                     if pen_outline:
-                        painter.setPen(pen_outline)
                         painter.drawEllipse(rect)
-                        painter.setPen(pen)
+                    painter.setPen(pen)
                     painter.drawEllipse(rect)
+                    self.draw_text(painter, rect.x(), rect.y(),
+                                   rect.width(), rect.height())
                 elif self.toolkit.switch == 3:
+                    if pen_outline:
+                        painter.drawRect(rect)
+                    painter.setPen(pen)
                     painter.drawRect(rect)
+                    self.draw_text(painter, rect.x(), rect.y(),
+                                   rect.width(), rect.height())
                 elif self.toolkit.switch == 4:
-                    painter.drawLine(self.begin.x(), self.begin.y(),
-                                     self.end.x(), self.end.y())
+                    line = QtCore.QLineF(self.begin.x(), self.begin.y(),
+                                        self.end.x(), self.end.y())
+                    if self.quadratic:
+                        line = QtCore.QLineF(self.begin.x(), self.begin.y(),
+                                             self.end.x(), self.end.y())
+                        angle = self.line_align(line.angle())
+                        line.setAngle(angle)
+                    if pen_outline:
+                        painter.drawLine(line)
+                    painter.setPen(pen)
+                    painter.drawLine(line)
+                    self.draw_text(painter, line.x1(), line.y1(),
+                                   int(line.length()), float('%02d' % line.angle()),
+                                   offset=False)
                 else:
                     # switch 0: selection, switch 6: blur
                     painter.setPen(sel_pen)
                     painter.setBrush(sel_brush)
                     if self.begin != self.end:
                         painter.drawRect(rect)
-                        self.draw_cords(painter, rect.x(), rect.y(),
-                                        rect.width(), rect.height())
+                        self.draw_text(painter, rect.x(), rect.y(),
+                                       rect.width(), rect.height())
                         self.sel_rect = rect
             else:
                 # redraw last selection rectangle on RMB click
@@ -327,28 +357,32 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                     painter.setPen(sel_pen)
                     painter.setBrush(sel_brush)
                     painter.drawRect(self.sel_rect)
-                    self.draw_cords(painter, self.sel_rect.x(), self.sel_rect.y(),
-                                    self.sel_rect.width(), self.sel_rect.height())
+                    self.draw_text(painter, self.sel_rect.x(), self.sel_rect.y(),
+                                   self.sel_rect.width(), self.sel_rect.height())
         else:
             painter.setPen(sel_pen)
             painter.setBrush(sel_brush)
             painter.drawRect(self.cords)
 
-            self.draw_cords(painter, self.cords.x(), self.cords.y(),
-                            self.cords.width(), self.cords.height())
+            self.draw_text(painter, self.cords.x(), self.cords.y(),
+                           self.cords.width(), self.cords.height())
             self.sel_rect = self.cords
             self.cords = None
 
-    def draw_cords(self, painter, *args):
+    def draw_text(self, painter, *args, offset=True):
         """
-        Draw selection coordinates with black outline.
+        Render text with shape size
         """
         x, y, width, height = args
-        xpos = x + (width // 2) - 32
-        ypos = y + (height // 2)
-        if abs(width) < 100 or abs(height) < 100:
+        if offset:
+            xpos = x + (width // 2) - 32
+            ypos = y + (height // 2)
+            if abs(width) < 100 or abs(height) < 100:
+                xpos = x
+                ypos = y - 12 if height > 0 else y + 24
+        else:
             xpos = x
-            ypos = y - 12 if height > 0 else y + 24
+            ypos = y
 
         for i in range(2):
             color = 'black' if i == 0 else 'white'
@@ -426,13 +460,13 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.pixel_info_label.setText(f'{_info:<8} {_cords:>7}')
 
             xpos = event.x() - 70
-            ypos = event.y() + 20
+            ypos = event.y() + 80
             if event.x() - 70 < 0:
                 xpos = event.x()
             if event.x() + 70 > self.width:
                 xpos = event.x() - 140
             if event.y() + 170 > self.height:
-                ypos = event.y() - 170
+                ypos = event.y() - 200
 
             self.view.move(xpos, ypos)
             self.pixel_info.move(self.view.pos().x() + 6, self.view.pos().y() + 6)
@@ -563,31 +597,33 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         if cp1:
             self.path.quadTo(cp1, points[-1])
 
+    def line_align(self, angle):
+        angles = [i for i in range(361) if i % 15 == 0]
+        return min(angles, key=lambda x: abs(x - angle))
+
     def rect_quadratic(self, rect):
         rectx, recty, rectw, recth = list(rect.getRect())
-        if '-' not in str(recth) and '-' not in str(rectw):
+        if (recth > 0 and rectw > 0) or \
+           (recth < 0 and rectw < 0):
             if rectw > recth:
-                rect = [rectx, recty, recth, recth]
+                rectw = recth
             else:
-                rect = [rectx, recty, rectw, rectw]
+                recth = rectw
         else:
-            if '-' in str(rectw) and '-' not in str(recth):
+            if rectw < 0 and recth > 0:
                 ab_w = abs(rectw)
                 if ab_w > recth:
-                    rect = [rectx, recty, -recth, recth]
+                    rectw = -recth
                 else:
-                    rect = [rectx, recty, rectw, ab_w]
-            elif '-' in str(recth) and '-' not in str(rectw):
+                    recth = ab_w
+            elif rectw > 0 and recth < 0:
                 ab_h = abs(recth)
                 if ab_h > recth:
-                    rect = [rectx, recty, rectw, -rectw]
+                    recth = -rectw
                 else:
-                    rect = [rectx, recty, ab_h, -recth]
-            else:
-                if rectw > recth:
-                    rect = [rectx, recty, recth, recth]
-                else:
-                    rect = [rectx, recty, rectw, rectw]
+                    rectw = ab_h
+                    recth = -recth
+        rect = [rectx, recty, rectw, recth]
         return QtCore.QRect(*rect)
 
     def ctypes_blur(self, p, dest_img, radius, quality, alpha_only, transposed=0):
@@ -677,7 +713,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
             self.history.sequence += 'b'
             for i in range(6):
-                painter.drawPixmap(rectx, recty, rectwidth, rectheight, dest)
+                painter.drawPixmap(rectx, recty, rectwidth+1, rectheight+1, dest)
             self.history.blur.append([rectx, recty, rectwidth, rectheight, dest])
             painter.end()
             self.update()
@@ -737,16 +773,21 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.drawRect(rect)
         elif self.toolkit.switch == 4:
             self.history.sequence += 'l'
-            self.history.line.append(((self.begin.x(), self.begin.y(),
-                                       self.end.x(), self.end.y()),
+            line = QtCore.QLine(self.begin.x(), self.begin.y(),
+                                self.end.x(), self.end.y())
+            if self.quadratic:
+                line = QtCore.QLineF(self.begin.x(), self.begin.y(),
+                                     self.end.x(), self.end.y())
+                angle = self.line_align(line.angle())
+                line.setAngle(angle)
+            self.history.line.append(((line.x1(), line.y1(),
+                                       line.x2(), line.y2()),
                                       pen, brush, pen_outline))
             if pen_outline:
                 painter.setPen(pen_outline)
-                painter.drawLine(self.begin.x(), self.begin.y(),
-                                 self.end.x(), self.end.y())
+                painter.drawLine(line)
                 painter.setPen(pen)
-            painter.drawLine(self.begin.x(), self.begin.y(),
-                             self.end.x(), self.end.y())
+            painter.drawLine(line)
 
         self.begin = QtCore.QPoint()
         self.end = QtCore.QPoint()
@@ -956,15 +997,19 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         else:
             self.worker = Worker(self.img_toolkit.uguu_upload, args, 'uguu.se')
 
-        self.save_image(push=False)
-
         tc_vis = self.toolkit.tools_config.isVisible()
         self.toolkit.hide()
         if tc_vis:
             self.toolkit.tools_config.hide()
+        self.hide()
+
+        if self.sel_rect is not None:
+            image = self.crop(self.pixmap())
+        else:
+            image = self.pixmap()
 
         if self.config.parse['config']['canvas']['upload_confirmation'] == 0:
-            self.confirmation_win = ConfirmationWindow(self, service, self.filepath)
+            self.confirmation_win = ConfirmationWindow(self, service, image)
             self.confirmation_win.show()
 
             result = self.confirmation_win.result
@@ -976,19 +1021,21 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 self.config.change_config('canvas', 'upload_confirmation', int(result[1]))
 
                 if not result[0]:
+                    self.showFullScreen()
+                    self.activateWindow()
                     self.toolkit.show()
                     if tc_vis:
                         self.toolkit.tools_config.show()
-                    os.remove(self.filepath)
                     return
             else:
+                self.showFullScreen()
+                self.activateWindow()
                 self.toolkit.show()
                 if tc_vis:
                     self.toolkit.tools_config.show()
-                os.remove(self.filepath)
                 return
 
-        self.hide()
+        self.save_image(push=False)
 
         self.thread = QtCore.QThread()
         self.worker.finished.connect(self.get_ret_val)

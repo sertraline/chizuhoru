@@ -24,6 +24,16 @@ except:
 _qt_blurImage = qtgui._Z12qt_blurImageP8QPainterR6QImagedbbi
 
 
+def ctypes_blur(p, dest_img, radius, quality, alpha_only, transposed=0):
+    p = ctypes.c_void_p(sip.unwrapinstance(p))
+    dest_img = ctypes.c_void_p(sip.unwrapinstance(dest_img))
+    radius = ctypes.c_double(radius)
+    quality = ctypes.c_bool(quality)
+    alpha_only = ctypes.c_bool(alpha_only)
+    transposed = ctypes.c_int(transposed)
+    _qt_blurImage(p, dest_img, radius, quality, alpha_only, transposed)
+
+
 class Worker(QtCore.QObject):
     finished = QtCore.pyqtSignal(list)
 
@@ -371,11 +381,14 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
     def draw_text(self, painter, *args, offset=True):
         """
-        Render text with shape size
+        Render text with size of the shape currently drawn by painter.
+
+        :param offset: if False, renders text at the beginning coordinate.
+        Otherwise renders text at approximate center of the shape.
         """
         x, y, width, height = args
         if offset:
-            xpos = x + (width // 2) - 32
+            xpos = x + (width // 2) - 36
             ypos = y + (height // 2)
             if abs(width) < 100 or abs(height) < 100:
                 xpos = x
@@ -397,7 +410,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                          '%s X %s' % (abs(width), abs(height)))
             painter.drawPath(path)
 
-    def closeScreen(self):
+    def window_destroy(self):
         if self.toolkit.tools_config.isVisible():
             self.toolkit.tools_config.close()
         self.toolkit.close()
@@ -407,16 +420,13 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         self.deleteLater()
         self.close()
 
-    def hideScreen(self):
-        self.hide()
-        self.toolkit.hide()
-
     def mousePressEvent(self, event):
         if event.buttons() == QtCore.Qt.RightButton:
             self.paint_allowed = False
             if self.toolkit.tools_config.isVisible():
                 self.toolkit.tools_config.close()
             else:
+                self.toolkit.show()
                 self.toolkit.tools_config.show()
             return
         if event.buttons() == QtCore.Qt.LeftButton:
@@ -441,7 +451,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 self.scene_sel.setRect(x, y, width, height)
             self.update()
 
-    def mouseMoveEvent(self, event):
+    def move_magnifier(self, event):
         if self.view.isVisible():
             self.view.setSceneRect(
                 (event.x()) - 70,
@@ -452,15 +462,17 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             self.cursor.setPos((event.x() - 8),
                                (event.y() - 8))
 
-            _px = self.pixel_data.pixel(event.x(), event.y())
-            _px = QtGui.QColor(_px).getRgb()
-            _px = _px[:-1]
-            _info = '#{:02x}{:02x}{:02x}'.format(*_px)
-            _cords = f'{event.x()}, {event.y()}'
-            self.pixel_info_label.setText(f'{_info:<8} {_cords:>7}')
+            if (event.x() >= 0 and event.y() >= 0) and (
+                    event.x() <= self.width and event.y() <= self.height):
+                _px = self.pixel_data.pixel(event.x(), event.y())
+                _px = QtGui.QColor(_px).getRgb()
+                _px = _px[:-1]
+                _info = '#{:02x}{:02x}{:02x}'.format(*_px)
+                _cords = f'{event.x()}, {event.y()}'
+                self.pixel_info_label.setText(f'{_info:<8} {_cords:>7}')
 
             xpos = event.x() - 70
-            ypos = event.y() + 80
+            ypos = event.y() + 50
             if event.x() - 70 < 0:
                 xpos = event.x()
             if event.x() + 70 > self.width:
@@ -469,9 +481,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
                 ypos = event.y() - 200
 
             self.view.move(xpos, ypos)
-            self.pixel_info.move(self.view.pos().x() + 6, self.view.pos().y() + 6)
+            self.pixel_info.move(self.view.pos().x() + 6,
+                                 self.view.pos().y() + 6)
             self.update()
 
+    def mouseMoveEvent(self, event):
+        self.move_magnifier(event)
         # switch 1: pen drawing, switch 5: free drawing
         if (self.toolkit.switch == 1 or self.toolkit.switch == 5) \
                 and event.buttons() == QtCore.Qt.LeftButton:
@@ -626,15 +641,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         rect = [rectx, recty, rectw, recth]
         return QtCore.QRect(*rect)
 
-    def ctypes_blur(self, p, dest_img, radius, quality, alpha_only, transposed=0):
-        p = ctypes.c_void_p(sip.unwrapinstance(p))
-        dest_img = ctypes.c_void_p(sip.unwrapinstance(dest_img))
-        radius = ctypes.c_double(radius)
-        quality = ctypes.c_bool(quality)
-        alpha_only = ctypes.c_bool(alpha_only)
-        transposed = ctypes.c_int(transposed)
-        _qt_blurImage(p, dest_img, radius, quality, alpha_only, transposed)
-
     def get_drawing_pen(self):
         pen_color = QtGui.QColor(*self.toolkit.color.fg.color)
         brush_color = QtGui.QColor(*self.toolkit.color.bg.color)
@@ -703,7 +709,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.setRenderHint(QPainter.LosslessImageRendering)
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
-            self.ctypes_blur(painter, tmp, 45, True, False)
+            ctypes_blur(painter, tmp, 45, True, False)
             painter.end()
 
             dest = QtGui.QPixmap().fromImage(blurred)
@@ -889,10 +895,10 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         elif event.key() == QtCore.Qt.Key_Return:
             self.save_image(clip_only=True)
-            self.closeScreen()
+            self.window_destroy()
 
         elif event.key() == QtCore.Qt.Key_Escape:
-            self.closeScreen()
+            self.window_destroy()
 
         elif 10 <= event.nativeScanCode() <= 16:
             for key in self.toolkit.switches:
@@ -903,12 +909,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         elif event.nativeScanCode() == 28:  # "T" key
             if self.toolkit.isVisible():
                 self.toolkit.hide()
+                self.toolkit.tools_config.hide()
             else:
                 self.toolkit.show()
 
         elif event.nativeScanCode() == 39:  # "S" key
             self.save_image()
-            self.hideScreen()
 
         elif event.nativeScanCode() == 38:  # "A" key
             cur_pos = QtGui.QCursor.pos()
@@ -984,7 +990,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
         else:
             self.app.clipboard().setPixmap(self.pixmap())
         if push:
-            self.closeScreen()
+            self.window_destroy()
 
     def upload_image(self):
         service = self.config.parse['config']['canvas']['upload_service']

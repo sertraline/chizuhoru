@@ -12,13 +12,6 @@ from PyQt5.Qt import QPalette, QColor
 from color_picker import ColorPicker
 
 
-def hex_to_rgb(hexv):
-    hexv = hexv[1:]
-    if not hexv:
-        return
-    return tuple(int(hexv[i:i+2], 16) for i in (0, 2, 4))
-
-
 class BaseLayer(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -70,7 +63,7 @@ class BaseLayerCanvas(QtWidgets.QLabel):
         self.last_x, self.last_y = None, None
 
 
-class ToolsConfig(QtWidgets.QDialog):
+class ToolsConfig(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
@@ -90,13 +83,13 @@ class ToolsConfig(QtWidgets.QDialog):
 
         self.widget_width, self.widget_height = 600, 260
         self.setFixedSize(self.widget_width, self.widget_height)
-        self.setGeometry((self.width/2) - (self.widget_width/2),
+        self.setGeometry((self.width // 2) - (self.widget_width // 2),
                          self.parent.pos().y() + 36,
                          self.widget_width, self.widget_height)
 
         self.color_picker = None
         self.init_ui()
-    
+
     def init_ui(self):
         hbox = QHBoxLayout()
         vbox = QVBoxLayout()
@@ -316,6 +309,7 @@ class Toolkit(BaseLayer):
         self.last_pos = None
 
         self.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
+        self.setMouseTracking(True)
 
         # E1E1E1
         self.setStyleSheet('background-color: #E1E1E1;')
@@ -461,6 +455,7 @@ class Toolkit(BaseLayer):
             self.tools[key].setFixedSize(24, 24)
             self.tools[key].setStyleSheet(self.btn_css % (sys.path[0], key))
             self.tools[key].clicked.connect(self.tool_sel)
+            self.tools[key].installEventFilter(self)
 
         left_spacer = QtWidgets.QSpacerItem(40, self.widget_height)
         left_grid.addWidget(self.tools['sel'])
@@ -482,6 +477,11 @@ class Toolkit(BaseLayer):
         grid.addItem(left_grid)
         grid.addItem(right_grid)
         self.setLayout(grid)
+
+    def eventFilter(self, source, event):
+        if event.type() == QtCore.QEvent.HoverMove:
+            self.parent.move_magnifier(QtGui.QCursor.pos())
+        return super().eventFilter(source, event)
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -511,6 +511,8 @@ class Toolkit(BaseLayer):
         self.last_pos = event.globalPos()
 
     def mouseMoveEvent(self, event):
+        cords = self.mapToParent(QPoint(event.x(), event.y()))
+        self.parent.move_magnifier(cords)
         if not self.last_pos:
             return
         delta = QPoint(event.globalPos() - self.last_pos)

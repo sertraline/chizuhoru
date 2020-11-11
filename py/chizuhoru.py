@@ -1,13 +1,14 @@
-from PyQt5 import QtWidgets
 from tray_app import Tray
 
 import sys
 import os
 
-class ChzInit():
+
+class ChzInit:
 
     def __init__(self, app, config, fallback=False):
         self.config = config
+        self.pidfile = None
         self.app = app
         self.check_pid()
         self.init_app(fallback)
@@ -17,7 +18,6 @@ class ChzInit():
         self.pidfile = "/tmp/chizuhoru.pid"
 
         try:
-            data = ''
             if os.path.isfile(self.pidfile):
                 try:
                     with open(self.pidfile, 'r') as testcheck:
@@ -26,14 +26,14 @@ class ChzInit():
                 except OSError:
                     os.remove(self.pidfile)
                 else:
-                    print(f"Another instance is running: {data}")
+                    print("Another instance is running: %s" % data)
                     # pass signal to the running instance
                     os.kill(data, 18)
                     sys.exit(0)
             with open(self.pidfile, 'w') as file:
                 file.write(pid)
         except PermissionError as e:
-            print(f"Error writing to '{self.pidfile}': {e}")
+            print("Error writing to '%s': %s" % (self.pidfile, e))
             sys.exit(1)
 
     def init_app(self, fallback):
@@ -42,5 +42,3 @@ class ChzInit():
 
         self.app.aboutToQuit.connect(self.app.deleteLater)
         sys.exit(self.app.exec_())
-
-        os.unlink(self.pidfile)

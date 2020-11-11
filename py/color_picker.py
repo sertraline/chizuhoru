@@ -11,24 +11,40 @@ def hsv_to_rgb(h, s, v):
 
 
 def rgb_to_hsv(r, g, b):
-    r, g, b = r/255.0, g/255.0, b/255.0
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
     mx = max(r, g, b)
     mn = min(r, g, b)
-    df = mx-mn
-    if mx == mn:
-        h = 0
-    elif mx == r:
-        h = (60 * ((g-b)/df) + 360) % 360
+    df = mx - mn
+    h = 0
+    if mx == r:
+        h = (60 * ((g - b) / df) + 360) % 360
     elif mx == g:
-        h = (60 * ((b-r)/df) + 120) % 360
+        h = (60 * ((b - r) / df) + 120) % 360
     elif mx == b:
-        h = (60 * ((r-g)/df) + 240) % 360
+        h = (60 * ((r - g) / df) + 240) % 360
     if mx == 0:
         s = 0
     else:
-        s = (df/mx)*100
-    v = mx*100
+        s = (df / mx)*100
+    v = mx * 100
     return h, s, v
+
+
+class JumpSlider(QtWidgets.QSlider):
+
+    def mousePressEvent(self, event):
+        val = QtWidgets.QStyle.sliderValueFromPosition(self.minimum(),
+                                                       self.maximum(),
+                                                       event.y(),
+                                                       self.height())
+        self.setValue(self.maximum() - val)
+
+    def mouseMoveEvent(self, event):
+        val = QtWidgets.QStyle.sliderValueFromPosition(self.minimum(),
+                                                       self.maximum(),
+                                                       event.y(),
+                                                       self.height())
+        self.setValue(self.maximum() - val)
 
 
 class RingSelector(QtWidgets.QLabel):
@@ -108,8 +124,8 @@ class ColorPicker(QtWidgets.QWidget):
         bg_s = self.config.parse['config']['canvas']['brush_sel']
 
         self.fg = ForegroundColor([int(i) for i in fg_c.split()],
-                                          [int(i) for i in fg_h.split()],
-                                          [int(i) for i in fg_s.split()])
+                                  [int(i) for i in fg_h.split()],
+                                  [int(i) for i in fg_s.split()])
         self.bg = BackgroundColor([int(i) for i in bg_c.split()],
                                   [int(i) for i in bg_h.split()],
                                   [int(i) for i in bg_s.split()])
@@ -164,7 +180,7 @@ class ColorPicker(QtWidgets.QWidget):
         gradient_box_child_overlay.addWidget(shades_overlay)
         self.gradient_box.setLayout(gradient_box_child_overlay)
 
-        self.hue_slider = QtWidgets.QSlider()
+        self.hue_slider = JumpSlider()
 
         self.hue_slider.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.hue_slider.setFixedHeight(self.box_size)
@@ -210,7 +226,7 @@ class ColorPicker(QtWidgets.QWidget):
         self.hue_slider.setTickPosition(QtWidgets.QSlider.NoTicks)
         self.hue_slider.setTickInterval(0)
 
-        self.opacity_slider = QtWidgets.QSlider()
+        self.opacity_slider = JumpSlider()
         self.opacity_slider.setFixedHeight(self.box_size)
         self.opacity_slider.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.opacity_slider.setStyleSheet("""

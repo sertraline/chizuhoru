@@ -563,12 +563,12 @@ class Toolkit(BaseLayer):
                 self.tool_sel(item[0])
 
     @QtCore.pyqtSlot()
-    def tool_sel(self, key=False):
-        def submit(key):
+    def tool_sel(self, key=None):
+        def submit(btn_key):
             self.reset_css()
-            self.tools[key].setStyleSheet(self.get_css(key, True))
+            self.tools[btn_key].setStyleSheet(self.get_css(btn_key, True))
             for switch in self.switches:
-                if key == switch[0]:
+                if btn_key == switch[0]:
                     self.switch = switch[1]
 
         if key:

@@ -74,7 +74,7 @@ class Tray(QtWidgets.QWidget):
         self.app = app
         self.config = app_config
         self.fallback = fallback
-        self.window = None
+        self.canvas_window = None
         self.main_window = None
         self.onclick_overlay = OnclickOverlay(self)
 
@@ -154,10 +154,11 @@ class Tray(QtWidgets.QWidget):
     def init_capture_check(self, default_delay=True, delay=0):
         gc.collect()
         try:
-            if self.window and self.window.isVisible():
+            print(self.canvas_window)
+            if self.canvas_window and self.canvas_window.isVisible():
                 print("Dialog already exists")
-            elif self.window and self.window.thread:
-                if self.window.thread.isRunning():
+            elif self.canvas_window and self.canvas_window.thread:
+                if self.canvas_window.thread.isRunning():
                     pass
             else:
                 if delay:
@@ -184,14 +185,14 @@ class Tray(QtWidgets.QWidget):
 
     def init_capture(self):
         try:
-            del self.window
+            del self.canvas_window
         except AttributeError:
             pass
-        self.window = ScreenWindow(self, self.app, self.config,
+        self.canvas_window = ScreenWindow(self, self.app, self.config,
                                    self.img_toolkit, self.fallback)
-        self.window.show()
-        self.window.activateWindow()
-        self.window.raise_()
+        self.canvas_window.show()
+        self.canvas_window.activateWindow()
+        self.canvas_window.raise_()
 
     def init_screen(self):
         try:

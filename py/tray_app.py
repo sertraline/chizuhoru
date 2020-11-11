@@ -154,7 +154,6 @@ class Tray(QtWidgets.QWidget):
     def init_capture_check(self, default_delay=True, delay=0):
         gc.collect()
         try:
-            print(self.canvas_window)
             if self.canvas_window and self.canvas_window.isVisible():
                 print("Dialog already exists")
             elif self.canvas_window and self.canvas_window.thread:

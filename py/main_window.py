@@ -702,7 +702,7 @@ class MainWindow(QtWidgets.QWidget):
             get_file = get_file.replace('file://', '')
         if not os.path.isfile(get_file):
             if get_file:
-                self.out.setText(f"File not found: %s" % get_file)
+                self.out.setText("File not found: %s" % get_file)
             return
 
         self.out.clear()

@@ -15,6 +15,7 @@ def rgb_to_hsv(r, g, b):
     mx = max(r, g, b)
     mn = min(r, g, b)
     df = mx - mn
+    df = 1 if df == 0 else df
     h = 0
     if mx == r:
         h = (60 * ((g - b) / df) + 360) % 360

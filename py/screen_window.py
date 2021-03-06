@@ -706,7 +706,6 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter = QPainter(blurred)
 
             painter.setRenderHint(QPainter.HighQualityAntialiasing)
-            painter.setRenderHint(QPainter.LosslessImageRendering)
             painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
             ctypes_blur(painter, tmp, 45, True, False)

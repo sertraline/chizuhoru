@@ -70,6 +70,7 @@ Where `PATH` must be replaced with actual path to this directory.
 | <kbd>S</kbd>                                           | Save image or selection               |
 | <kbd>A</kbd>                                           | Select window under the mouse pointer |
 | <kbd>Z</kbd>                                           | Toggle magnifier                      |
+| <kbd>C</kbd>                                           | Copy current color in magnifier to clipboard |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd>                         | Undo                                  |
 | <kbd>Hold shift while drawing</kbd>                    | Constraint key: ensure drawn shape has equal sides |
 | <kbd>1</kbd>                                           | Selection                             |

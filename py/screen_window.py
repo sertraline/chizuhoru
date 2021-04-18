@@ -943,6 +943,8 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
 
         elif event.nativeScanCode() == 54:  # "C"
             data = self.pixel_info_label.text()
+            if not data:
+                return
             data = data.split()[0]
             self.parent.app.clipboard().setText(data)
 

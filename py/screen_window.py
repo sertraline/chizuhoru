@@ -717,7 +717,7 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             painter.setRenderHint(QPainter.HighQualityAntialiasing)
 
             self.history.sequence += 'b'
-            for i in range(6):
+            for _ in range(6):
                 painter.drawPixmap(rectx, recty, rectwidth+1, rectheight+1, dest)
             self.history.blur.append([rectx, recty, rectwidth, rectheight, dest])
             painter.end()
@@ -940,6 +940,12 @@ class ScreenWindow(qt_toolkit.BaseLayerCanvas):
             else:
                 self.pixel_info.show()
                 self.view.show()
+
+        elif event.nativeScanCode() == 54:  # "C"
+            data = self.pixel_info_label.text()
+            data = data.split()[0]
+            self.parent.app.clipboard().setText(data)
+
         self.update()
 
     def keyReleaseEvent(self, _):
